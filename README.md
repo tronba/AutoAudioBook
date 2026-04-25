@@ -1,6 +1,6 @@
 # AutoAudioBook
 
-Version 0.4 is the current working build. It is a local-first single-page app that ingests PDF or DOCX books, extracts text, uses Gemini to create a reviewable annotation artifact, previews chunking, and can generate per-chunk WAV files with Gemini 3.1 Flash TTS.
+AutoAudioBook ingests PDF or DOCX books, extracts the text, creates a reviewable annotation artifact with Gemini inline TTS tags, previews chunking, and can generate per-chunk WAV audio with Gemini 3.1 Flash TTS.
 
 ## Current scope
 
@@ -15,24 +15,7 @@ Version 0.4 is the current working build. It is a local-first single-page app th
 
 ffmpeg chapter merging is intentionally not wired yet. The current code now includes a Gemini-first annotation and TTS path against the existing internal schema.
 
-## Run locally
-
-1. Create a virtual environment.
-2. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-3. Start the app:
-
-```bash
-uvicorn app:app --reload
-```
-
-4. Open http://127.0.0.1:8000
-
-## Run on Ubuntu 24.04 test server
+## Install on Ubuntu 24.04
 
 Use the committed server guide in [docs/ubuntu-24-server-setup.md](docs/ubuntu-24-server-setup.md).
 
