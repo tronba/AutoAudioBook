@@ -50,6 +50,12 @@ sudo journalctl -u autoaudiobook -n 100 --no-pager
 - Previews chunking before synthesis
 - Generates WAV audio with Gemini TTS
 
+## Input file notes
+
+- DOCX input files should mark chapter headings with the Word style `Header 1`
+- Text before the first Chapter 1 marker is included in Chapter 1 by default
+- That opening text can be split out instead if you enable the separate pre-chapter text option during generation
+
 ## Tag configuration
 
 Editable inline tag vocabulary lives in `tts_tags.toml`.

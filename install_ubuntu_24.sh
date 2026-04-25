@@ -56,8 +56,7 @@ if [[ -n "${existing_api_key}" ]]; then
 fi
 
 while true; do
-  read -rsp "Gemini API key: " gemini_api_key
-  echo
+  read -rp "Gemini API key: " gemini_api_key
   if [[ -n "${gemini_api_key}" ]]; then
     break
   fi

@@ -1812,17 +1812,18 @@ def build_gemini_tts_prompt(
     segments: list[SegmentAnnotation],
 ) -> str:
     transcript = build_tts_transcript(segments)
-    chapter_heading = f"### CHAPTER\n{chapter_title}\n\n" if chapter_title.strip() else ""
+    chapter_context = f"Chapter context: {chapter_title}.\n" if chapter_title.strip() else ""
     return (
         "Please synthesize speech audio for the transcript below.\n"
         "Read only the transcript. Do not read headings, notes, or metadata aloud.\n\n"
         f"### BOOK\n{book_title}\n\n"
-        f"{chapter_heading}"
         "### DIRECTOR'S NOTES\n"
+        f"{chapter_context}"
         f"Voice: {voice_name}.\n"
         f"Language: {language_code}.\n"
         f"Style: {style_instruction}\n"
         "Pacing: Respect paragraph breaks and inline pause tags.\n"
+        "Continuity: Use one continuous narrator voice across the entire transcript. Do not switch to a different voice for pre-chapter text, chapter titles, or the opening body paragraphs unless inline tags explicitly call for it.\n"
         "Accent: Neutral modern spoken English unless the transcript strongly suggests otherwise.\n\n"
         "### TRANSCRIPT\n"
         f"{transcript}"
@@ -2213,6 +2214,34 @@ def read_draft_annotation_status(book_id: str) -> dict[str, Any] | None:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def materialize_chapter_audio_output(
+    book_id: str,
+    chapter_index: int,
+    chapter_title: str,
+    voice_name: str,
+    speech_rate: float,
+    output_format: AudioOutputFormat,
+    audio_quality: AudioQualityPreset,
+    chapter_chunks: list[bytes],
+    sample_rate: int,
+) -> Path:
+    raw_chapter_path = build_raw_chapter_audio_path(book_id, chapter_index, voice_name)
+    chapter_output_path = build_chapter_output_path(
+        book_id,
+        chapter_index,
+        chapter_title,
+        voice_name,
+        speech_rate,
+        output_format,
+    )
+    chapter_pcm = concatenate_pcm_chunks(chapter_chunks)
+    write_wave_file(raw_chapter_path, chapter_pcm, rate=sample_rate)
+    if output_format == "wav":
+        return raw_chapter_path
+    encode_mp3_with_speed(raw_chapter_path, chapter_output_path, speech_rate, audio_quality)
+    return chapter_output_path
+
+
 def encode_mp3_with_speed(
     source_path: Path,
     destination_path: Path,
@@ -2293,6 +2322,7 @@ def serialize_book(row: sqlite3.Row) -> dict[str, Any]:
 
 
 def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -> None:
+    generated_chapters: list[dict[str, Any]] = []
     try:
         book = get_book_or_404(book_id)
         extracted = read_json(Path(book["extracted_path"]))
@@ -2368,6 +2398,7 @@ def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -
         chapter_audio: dict[int, list[bytes]] = {}
         chapter_sample_rates: dict[int, int] = {}
         chapter_titles: dict[int, str] = {}
+        chapter_output_paths: list[Path] = []
         chapter_chunk_totals: dict[int, int] = {}
         for chunk in chunks:
             chapter_index = chunk["chapter_index"]
@@ -2443,6 +2474,56 @@ def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -
             chunk_path = build_chunk_audio_path(book_id, chunk["chapter_index"], chunk["chunk_index"], request.voice_name)
             write_wave_file(chunk_path, audio_bytes, rate=sample_rate)
 
+            if chapter_chunk_positions[chapter_index] == chapter_chunk_totals.get(chapter_index, 0):
+                write_audio_generation_status(
+                    book_id,
+                    {
+                        "state": "running",
+                        "step": f"Finalizing chapter {chapter_index + 1}",
+                        "chunk_index": position,
+                        "chunk_count": len(chunks),
+                        "active_chapter_index": chapter_index,
+                        "active_chapter_title": chunk["chapter_title"],
+                        "chapter_chunk_index": chapter_chunk_positions[chapter_index],
+                        "chapter_chunk_count": chapter_chunk_totals.get(chapter_index, 0),
+                        "download_url": None,
+                        "file_name": None,
+                        "speech_rate": request.speech_rate,
+                        "voice_name": request.voice_name,
+                        "language_code": request.language_code,
+                        "style_instruction": request.style_instruction,
+                        "output_format": request.output_format,
+                        "audio_quality": request.audio_quality,
+                        "selected_chapter_indexes": selected_chapter_indexes,
+                        "generated_chapters": generated_chapters,
+                        "updated_at": now_iso(),
+                    },
+                )
+                chapter_output_path = materialize_chapter_audio_output(
+                    book_id,
+                    chapter_index,
+                    chapter_titles[chapter_index],
+                    request.voice_name,
+                    request.speech_rate,
+                    request.output_format,
+                    request.audio_quality,
+                    chapter_audio[chapter_index],
+                    chapter_sample_rates.get(chapter_index, DEFAULT_AUDIO_SAMPLE_RATE),
+                )
+                chapter_output_paths.append(chapter_output_path)
+                generated_chapters.append(
+                    {
+                        "chapter_index": chapter_index,
+                        "chapter_title": chapter_titles[chapter_index],
+                        "file_name": chapter_output_path.name,
+                        "download_url": f"/files/audio/{book_id}/{chapter_output_path.name}",
+                        "output_format": request.output_format,
+                    }
+                )
+                chapter_audio.pop(chapter_index, None)
+                chapter_sample_rates.pop(chapter_index, None)
+                chapter_titles.pop(chapter_index, None)
+
         write_audio_generation_status(
             book_id,
             {
@@ -2459,58 +2540,10 @@ def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -
                 "output_format": request.output_format,
                 "audio_quality": request.audio_quality,
                 "selected_chapter_indexes": selected_chapter_indexes,
+                "generated_chapters": generated_chapters,
                 "updated_at": now_iso(),
             },
         )
-
-        write_audio_generation_status(
-            book_id,
-            {
-                "state": "running",
-                "step": "Merging chapter audio",
-                "chunk_index": len(chunks),
-                "chunk_count": len(chunks),
-                "download_url": None,
-                "file_name": None,
-                "speech_rate": request.speech_rate,
-                "voice_name": request.voice_name,
-                "language_code": request.language_code,
-                "style_instruction": request.style_instruction,
-                "output_format": request.output_format,
-                "audio_quality": request.audio_quality,
-                "selected_chapter_indexes": selected_chapter_indexes,
-                "updated_at": now_iso(),
-            },
-        )
-
-        chapter_output_paths: list[Path] = []
-        generated_chapters: list[dict[str, Any]] = []
-        for chapter_index in sorted(chapter_audio):
-            raw_chapter_path = build_raw_chapter_audio_path(book_id, chapter_index, request.voice_name)
-            chapter_output_path = build_chapter_output_path(
-                book_id,
-                chapter_index,
-                chapter_titles[chapter_index],
-                request.voice_name,
-                request.speech_rate,
-                request.output_format,
-            )
-            chapter_pcm = concatenate_pcm_chunks(chapter_audio[chapter_index])
-            write_wave_file(raw_chapter_path, chapter_pcm, rate=chapter_sample_rates.get(chapter_index, DEFAULT_AUDIO_SAMPLE_RATE))
-            if request.output_format == "wav":
-                chapter_output_path = raw_chapter_path
-            else:
-                encode_mp3_with_speed(raw_chapter_path, chapter_output_path, request.speech_rate, request.audio_quality)
-            chapter_output_paths.append(chapter_output_path)
-            generated_chapters.append(
-                {
-                    "chapter_index": chapter_index,
-                    "chapter_title": chapter_titles[chapter_index],
-                    "file_name": chapter_output_path.name,
-                    "download_url": f"/files/audio/{book_id}/{chapter_output_path.name}",
-                    "output_format": request.output_format,
-                }
-            )
 
         if len(chapter_output_paths) == 1:
             final_download_path = chapter_output_paths[0]
@@ -2579,6 +2612,7 @@ def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -
                 "output_format": request.output_format,
                 "audio_quality": request.audio_quality,
                 "selected_chapter_indexes": selected_chapter_indexes,
+                "generated_chapters": generated_chapters,
                 "updated_at": now_iso(),
             },
         )
