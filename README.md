@@ -1,6 +1,8 @@
 # AutoAudioBook
+<img width="913" height="621" alt="tagging" src="https://github.com/user-attachments/assets/22519db0-0105-4db8-8f27-edfca3f407ed" />
 
 AutoAudioBook ingests PDF or DOCX books, extracts the text, creates a reviewable annotation artifact with Gemini inline TTS tags, previews chunking, and can generate per-chunk WAV audio with Gemini 3.1 Flash TTS.
+I run this on a Ubuntu 24.04 VM running on two cores and 4GB ram om a Beelink ME Pro.
 
 This project was developed in VS Code with GitHub Copilot using GPT-5.4.
 
@@ -43,7 +45,7 @@ sudo journalctl -u autoaudiobook -n 100 --no-pager
 ```
 
 ## What it does
-
+<img width="1672" height="941" alt="model" src="https://github.com/user-attachments/assets/ff0f7a4d-c5df-4d55-a17f-e000f2da5cc7" />
 - Imports PDF or DOCX books
 - Generates a reviewable annotated DOCX with inline TTS tags
 - Lets you upload an approved annotation for audio generation
