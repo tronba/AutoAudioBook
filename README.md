@@ -46,6 +46,7 @@ sudo journalctl -u autoaudiobook -n 100 --no-pager
 
 ## What it does
 <img width="1672" height="941" alt="model" src="https://github.com/user-attachments/assets/ff0f7a4d-c5df-4d55-a17f-e000f2da5cc7" />
+
 - Imports PDF or DOCX books
 - Generates a reviewable annotated DOCX with inline TTS tags
 - Lets you upload an approved annotation for audio generation
