@@ -1,0 +1,199 @@
+[[expressive_tags]]
+tag = "[frustrated]"
+min_mode = "conservative"
+
+[[expressive_tags]]
+tag = "[annoyed]"
+min_mode = "conservative"
+
+[[expressive_tags]]
+tag = "[angry]"
+min_mode = "expressive"
+
+[[expressive_tags]]
+tag = "[tense]"
+min_mode = "conservative"
+
+[[expressive_tags]]
+tag = "[agitated]"
+min_mode = "expressive"
+
+[[expressive_tags]]
+tag = "[warm]"
+min_mode = "conservative"
+
+[[expressive_tags]]
+tag = "[weary]"
+min_mode = "conservative"
+
+[[expressive_tags]]
+tag = "[hesitant]"
+min_mode = "conservative"
+
+[[expressive_tags]]
+tag = "[relieved]"
+min_mode = "conservative"
+
+[[expressive_tags]]
+tag = "[reassuring]"
+min_mode = "conservative"
+
+[[expressive_tags]]
+tag = "[pleading]"
+min_mode = "conservative"
+
+[[expressive_tags]]
+tag = "[breathless]"
+min_mode = "expressive"
+
+[[expressive_tags]]
+tag = "[shaky]"
+min_mode = "expressive"
+
+[[expressive_tags]]
+tag = "[softly]"
+min_mode = "conservative"
+
+[[expressive_tags]]
+tag = "[afraid]"
+min_mode = "conservative"
+
+[[expressive_tags]]
+tag = "[disgusted]"
+min_mode = "expressive"
+
+[[expressive_tags]]
+tag = "[under her breath]"
+min_mode = "conservative"
+
+[[expressive_tags]]
+tag = "[through gritted teeth]"
+min_mode = "expressive"
+
+[[expressive_tags]]
+tag = "[voice breaking]"
+min_mode = "conservative"
+
+[[expressive_tags]]
+tag = "[after a pause]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[sighs]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[gasps]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[laughs]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[chuckles]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[snorts]"
+min_mode = "expressive"
+
+[[vocalization_tags]]
+tag = "[scoffs]"
+min_mode = "expressive"
+
+[[vocalization_tags]]
+tag = "[harumphs]"
+min_mode = "expressive"
+
+[[vocalization_tags]]
+tag = "[huffs]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[breathing hard]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[exhales slowly]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[groans]"
+min_mode = "expressive"
+
+[[vocalization_tags]]
+tag = "[moans]"
+min_mode = "expressive"
+
+[[vocalization_tags]]
+tag = "[yelps]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[murmurs]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[whispers]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[coughs]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[sniffling]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[wincing]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[grunts]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[humming]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[drawls]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[shuddering]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[trembling breath]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[half laughing]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[half crying]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[gasping]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[swearing under breath]"
+min_mode = "expressive"
+
+[[vocalization_tags]]
+tag = "[laughing nervously]"
+min_mode = "conservative"
+
+[[vocalization_tags]]
+tag = "[fighting tears]"
+min_mode = "expressive"
+
+[[vocalization_tags]]
+tag = "[breathing unevenly]"
+min_mode = "conservative"

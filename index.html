@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoAudioBook</title>
+  <style>
+    :root {
+      --bg: #f7f2ea;
+      --panel: rgba(255, 252, 246, 0.94);
+      --ink: #1f1a17;
+      --muted: #6f6259;
+      --line: rgba(65, 48, 35, 0.18);
+      --accent: #9f3f2f;
+      --accent-soft: #f2dbd3;
+      --success: #2f6b48;
+      --shadow: 0 18px 45px rgba(47, 34, 25, 0.12);
+      --radius: 22px;
+      --mono: "Consolas", "SFMono-Regular", monospace;
+      --serif: "Georgia", "Times New Roman", serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--serif);
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(231, 208, 182, 0.8), transparent 30%),
+        radial-gradient(circle at right 20%, rgba(159, 63, 47, 0.18), transparent 28%),
+        linear-gradient(180deg, #fbf7f0 0%, var(--bg) 100%);
+      min-height: 100vh;
+    }
+
+    main {
+      width: min(1030px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 20px 0 40px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, rgba(255, 250, 244, 0.94), rgba(246, 229, 214, 0.94));
+      border: 1px solid var(--line);
+      border-radius: 30px;
+      box-shadow: var(--shadow);
+      padding: 18px 22px;
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    h1, h2 {
+      margin: 0;
+      font-weight: 700;
+    }
+
+    h1 {
+      font-size: clamp(1.7rem, 3vw, 2.5rem);
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    h2 {
+      margin-bottom: 6px;
+      font-size: 1.45rem;
+    }
+
+    p {
+      margin: 0;
+      line-height: 1.55;
+    }
+
+    .hero p,
+    .section-copy,
+    .mono-note {
+      color: var(--muted);
+    }
+
+    .hero p {
+      max-width: 60ch;
+      font-size: 0.98rem;
+    }
+
+    .stack {
+      display: grid;
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      backdrop-filter: blur(10px);
+    }
+
+    .panel-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .field-grid-two {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      align-items: start;
+    }
+
+    .generator-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.85fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .generator-sidebar {
+      display: grid;
+      gap: 14px;
+    }
+
+    .toggle-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      align-items: start;
+    }
+
+    .toggle-card {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: start;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--ink);
+    }
+
+    .toggle-card input[type="checkbox"] {
+      margin-top: 3px;
+    }
+
+    .toggle-title {
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .toggle-note {
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.45;
+    }
+
+    .section-head {
+      display: grid;
+      gap: 6px;
+    }
+
+    form {
+      display: grid;
+      gap: 14px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    .label-head {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+    }
+
+    .help-chip {
+      position: relative;
+      display: inline-grid;
+      place-items: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(159, 63, 47, 0.35);
+      background: rgba(159, 63, 47, 0.08);
+      color: var(--accent);
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: help;
+    }
+
+    .help-chip:focus-visible {
+      outline: 2px solid rgba(159, 63, 47, 0.35);
+      outline-offset: 2px;
+    }
+
+    .help-text {
+      position: absolute;
+      left: 0;
+      top: calc(100% + 8px);
+      z-index: 10;
+      width: min(300px, 70vw);
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(65, 48, 35, 0.16);
+      background: rgba(255, 252, 246, 0.98);
+      box-shadow: 0 10px 28px rgba(47, 34, 25, 0.16);
+      color: var(--ink);
+      font-size: 0.82rem;
+      line-height: 1.45;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(4px);
+      transition: opacity 120ms ease, transform 120ms ease;
+    }
+
+    .help-chip:hover .help-text,
+    .help-chip:focus-visible .help-text {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    input[type="file"],
+    input[type="number"],
+    textarea,
+    select,
+    button {
+      font: inherit;
+    }
+
+    input[type="file"],
+    input[type="number"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(65, 48, 35, 0.2);
+      background: rgba(255, 255, 255, 0.86);
+      color: var(--ink);
+    }
+
+    textarea {
+      min-height: 96px;
+      resize: vertical;
+    }
+
+    button {
+      border: 0;
+      border-radius: 14px;
+      padding: 12px 16px;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+      transition: transform 120ms ease, opacity 120ms ease;
+    }
+
+    button.secondary {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid rgba(159, 63, 47, 0.3);
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: wait;
+      transform: none;
+    }
+
+    .summary-card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 16px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .book-meta,
+    .inline-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .book-meta {
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+
+    .pill {
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(65, 48, 35, 0.08);
+    }
+
+    .status {
+      padding: 12px 14px;
+      border-radius: 14px;
+      font-size: 0.92rem;
+      background: rgba(159, 63, 47, 0.08);
+      color: var(--muted);
+      min-height: 44px;
+    }
+
+    .status.success {
+      background: rgba(47, 107, 72, 0.12);
+      color: var(--success);
+    }
+
+    .download-link {
+      color: var(--accent);
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .download-link:hover {
+      text-decoration: underline;
+    }
+
+    .mono-note {
+      font-family: var(--mono);
+      font-size: 0.84rem;
+    }
+
+    .chapter-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .slider-control {
+      display: grid;
+      gap: 8px;
+    }
+
+    .slider-copy {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      flex-wrap: wrap;
+    }
+
+    .slider-value {
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .slider-note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .chapter-list {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.7);
+      padding: 14px;
+    }
+
+    .chapter-item {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: start;
+      padding: 10px 0;
+      border-top: 1px solid rgba(65, 48, 35, 0.12);
+    }
+
+    .chapter-item:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .chapter-item:last-child {
+      padding-bottom: 0;
+    }
+
+    .chapter-title {
+      font-weight: 600;
+    }
+
+    .chapter-body {
+      display: grid;
+      gap: 4px;
+    }
+
+    .chapter-meta {
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .chapter-progress {
+      color: var(--accent);
+      font-size: 0.84rem;
+      font-weight: 600;
+    }
+
+    .upload-hint {
+      margin-top: -4px;
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .upload-summary {
+      display: grid;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.78);
+      padding: 14px 16px;
+    }
+
+    .progress-card {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.78);
+      padding: 14px 16px;
+    }
+
+    .progress-card[hidden] {
+      display: none;
+    }
+
+    .progress-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .progress-metric {
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+
+    .progress-track {
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(65, 48, 35, 0.1);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), #c76d5e);
+      transition: width 180ms ease;
+    }
+
+    .downloads-panel {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.7);
+      padding: 14px;
+    }
+
+    .downloads-panel[hidden] {
+      display: none;
+    }
+
+    .download-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .chapter-download-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .chapter-download-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(65, 48, 35, 0.12);
+    }
+
+    .chapter-download-item:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    @media (max-width: 860px) {
+      main {
+        width: min(100%, calc(100% - 24px));
+      }
+
+      .field-grid-two,
+      .generator-layout,
+      .toggle-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <div class="eyebrow">Version 0.4</div>
+      <h1>Auto tagging first. Audiobook generation second.</h1>
+      <p>AutoAudioBook turns PDF or DOCX books into reviewable, tag-aware audiobook projects with chapter chunking, annotation approval, and Gemini-powered speech generation.</p>
+    </section>
+
+    <section class="stack">
+      <section class="panel panel-grid">
+        <div class="section-head">
+          <h2>Auto Tagging</h2>
+          <p class="section-copy">Upload a PDF or DOCX, extract the text, and download an annotated DOCX.</p>
+        </div>
+
+        <form id="upload-form">
+          <label>
+            Source file
+            <input type="file" id="source-file" accept=".pdf,.docx" required>
+          </label>
+          <button type="submit">Upload and extract</button>
+        </form>
+
+        <div class="summary-card">
+          <strong id="current-book-title">No source book loaded</strong>
+          <div class="book-meta">
+            <span class="pill" id="current-book-type">Source</span>
+            <span class="pill" id="current-book-state">Waiting</span>
+          </div>
+          <p class="mono-note" id="current-book-note">Upload a file to start the workflow.</p>
+        </div>
+
+        <div class="inline-actions">
+          <label>
+            <span class="label-head">
+              <span>Expressive delivery tags</span>
+              <span class="help-chip" tabindex="0" aria-label="Expressive delivery tag help">?<span class="help-text">Adds delivery cues like hesitant, warm, or through gritted teeth. Conservative: only when the text says it or it is very obvious. Balanced: also when strongly implied. Expressive: allows broader performance interpretation.</span></span>
+            </span>
+            <select id="expressive-tags-mode">
+              <option value="off">Off</option>
+              <option value="conservative" selected>Conservative</option>
+              <option value="balanced">Balanced</option>
+              <option value="expressive">Expressive</option>
+            </select>
+          </label>
+          <label>
+            <span class="label-head">
+              <span>Vocalization tags</span>
+              <span class="help-chip" tabindex="0" aria-label="Vocalization tag help">?<span class="help-text">Adds nonverbal cues like [sighs], [laughs], or [trembling breath]. Conservative: only when explicit or extremely obvious. Balanced: also when strongly implied. Expressive: allows broader dramatic vocalization choices.</span></span>
+            </span>
+            <select id="vocalization-tags-mode">
+              <option value="off" selected>Off</option>
+              <option value="conservative">Conservative</option>
+              <option value="balanced">Balanced</option>
+              <option value="expressive">Expressive</option>
+            </select>
+          </label>
+          <button id="draft-button" disabled>Generate annotated DOCX</button>
+          <a id="draft-link" class="download-link" href="#" hidden download>Download annotated DOCX</a>
+        </div>
+
+        <div class="progress-card" id="draft-progress" hidden>
+          <div class="progress-head">
+            <strong id="draft-progress-title">Draft annotation progress</strong>
+            <span class="pill" id="draft-progress-state">Idle</span>
+          </div>
+          <div class="progress-metric" id="draft-progress-step">Waiting to start.</div>
+          <div class="progress-track">
+            <div class="progress-fill" id="draft-progress-fill"></div>
+          </div>
+          <div class="book-meta">
+            <span class="pill" id="draft-progress-count">0 / 0 chapters</span>
+            <span class="pill" id="draft-progress-percent">0%</span>
+          </div>
+          <p class="mono-note" id="draft-progress-note">Generate an annotated DOCX to start chapter-by-chapter progress tracking.</p>
+        </div>
+
+        <div class="status" id="tagging-status">Waiting for the first upload.</div>
+      </section>
+
+      <section class="panel panel-grid">
+        <div class="section-head">
+          <h2>Audiobook Generator</h2>
+          <p class="section-copy">Upload an approved annotated DOCX directly, or continue from the auto tagging step, then generate chapter audio files.</p>
+        </div>
+
+        <form id="approved-form">
+          <label>
+            Approved annotated DOCX
+            <input type="file" id="approved-file" accept=".docx">
+          </label>
+        </form>
+        <p class="upload-hint">Selecting a file uploads it immediately. If a book is already loaded, this replaces that book's approved annotation.</p>
+
+        <div class="upload-summary" id="approved-file-summary">
+          <strong id="approved-file-title">No approved annotation loaded</strong>
+          <div class="book-meta">
+            <span class="pill" id="approved-file-state">Waiting</span>
+            <span class="pill" id="approved-file-chapters">0 chapters</span>
+          </div>
+          <p class="mono-note" id="approved-file-note">Select an approved annotated DOCX to load it into the audiobook generator.</p>
+        </div>
+
+        <div class="slider-control">
+          <div class="slider-copy">
+            <label for="chunk-size">Chunk limit</label>
+            <span class="slider-value" id="chunk-size-value">500 characters</span>
+          </div>
+          <input type="range" id="chunk-size" min="0" max="0" step="1" value="2">
+          <p class="slider-note">Normal cut point. The chunker will still prefer whole paragraphs until the hard limit needs sentence-level splitting.</p>
+        </div>
+
+        <div class="slider-control">
+          <div class="slider-copy">
+            <label for="hard-max-chars">Hard limit</label>
+            <span class="slider-value" id="hard-max-chars-value">650 characters (+150)</span>
+          </div>
+          <input type="range" id="hard-max-chars" min="0" max="0" step="1" value="2">
+          <p class="slider-note">When a paragraph would overshoot this, the chunker splits at the next sentence, then falls back to shorter cuts only if one sentence is still too long.</p>
+        </div>
+
+        <div class="field-grid-two">
+          <label>
+            Voice
+            <select id="voice-name"></select>
+          </label>
+
+          <label>
+            Language
+            <select id="language-code"></select>
+          </label>
+        </div>
+
+        <div class="generator-layout">
+          <label>
+            Style instruction
+            <textarea id="style-instruction"></textarea>
+          </label>
+
+          <div class="generator-sidebar">
+            <label>
+              Audio speed
+              <input type="number" id="speech-rate" min="0.8" max="1.5" step="0.05" value="1.05">
+            </label>
+
+            <label>
+              Output format
+              <select id="output-format">
+                <option value="mp3" selected>MP3</option>
+                <option value="wav">WAV</option>
+              </select>
+            </label>
+
+            <label>
+              Audio quality
+              <select id="audio-quality">
+                <option value="best" selected>Best</option>
+                <option value="standard">Standard</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="toggle-grid">
+          <label class="toggle-card">
+            <input type="checkbox" id="read-chapter-titles" checked>
+            <span>
+              <span class="toggle-title">Read chapter titles</span>
+              <span class="toggle-note">Adds the chapter heading to the spoken transcript before the chapter text.</span>
+            </span>
+          </label>
+
+          <label class="toggle-card">
+            <input type="checkbox" id="separate-pre-chapter-text">
+            <span>
+              <span class="toggle-title">Separate Chapter 0</span>
+              <span class="toggle-note">Moves text before the first chapter heading into its own selectable Chapter 0 file.</span>
+            </span>
+          </label>
+        </div>
+
+        <div class="section-head">
+          <h2>Chapter Selection</h2>
+          <p class="section-copy">Choose the chapters to generate so failed runs can be retried without redoing the whole book.</p>
+        </div>
+
+        <div class="chapter-actions">
+          <button type="button" class="secondary" id="select-all-chapters" disabled>Select all</button>
+          <button type="button" class="secondary" id="clear-all-chapters" disabled>Clear all</button>
+        </div>
+
+        <div class="chapter-list" id="chapter-list">
+          <p class="section-copy">Upload an approved annotated DOCX to load the chapter list.</p>
+        </div>
+
+        <div class="downloads-panel" id="chapter-downloads" hidden>
+          <div class="section-head">
+            <h2>Downloads</h2>
+            <p class="section-copy">Download individual chapter files or the full generated bundle.</p>
+          </div>
+          <div class="download-actions">
+            <a id="download-all-link" class="download-link" href="#" hidden download>Download all</a>
+          </div>
+          <div class="chapter-download-list" id="chapter-download-list"></div>
+        </div>
+
+        <div class="inline-actions">
+          <button id="audio-button" class="secondary" disabled>Generate chapter audio files</button>
+          <a id="audio-link" class="download-link" href="#" hidden download>Download chapter audio</a>
+        </div>
+
+        <div class="status" id="audio-status">Upload an approved annotated DOCX to continue.</div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const DEFAULT_STYLE_INSTRUCTION = 'Read aloud in a warm, welcoming tone with clear diction and natural pacing.';
+    const FALLBACK_CHUNK_LIMIT_PRESETS = [100, 200, 300, 400, 500, 650, 800, 1000, 1250, 1500];
+    const FALLBACK_HARD_LIMIT_OVERFLOW_PRESETS = [0, 25, 50, 75, 100, 150, 200, 300, 400, 500];
+
+    const state = {
+      currentBook: null,
+      draftStatusTimer: null,
+      audioStatusTimer: null,
+      generatorOptions: null,
+      draftAnnotationStatus: null,
+      audioGenerationStatus: null,
+      chapterPlan: [],
+      selectedChapterIndexes: [],
+      chapterSelectionInitialized: false,
+      chapterPlanLoading: false,
+      uploadingApprovedFile: false,
+      pendingApprovedFileName: '',
+      chapterPlanRequestToken: 0,
+    };
+
+    const elements = {
+      uploadForm: document.getElementById('upload-form'),
+      sourceFile: document.getElementById('source-file'),
+      currentBookTitle: document.getElementById('current-book-title'),
+      currentBookType: document.getElementById('current-book-type'),
+      currentBookState: document.getElementById('current-book-state'),
+      currentBookNote: document.getElementById('current-book-note'),
+      draftButton: document.getElementById('draft-button'),
+      draftLink: document.getElementById('draft-link'),
+      draftProgress: document.getElementById('draft-progress'),
+      draftProgressTitle: document.getElementById('draft-progress-title'),
+      draftProgressState: document.getElementById('draft-progress-state'),
+      draftProgressStep: document.getElementById('draft-progress-step'),
+      draftProgressFill: document.getElementById('draft-progress-fill'),
+      draftProgressCount: document.getElementById('draft-progress-count'),
+      draftProgressPercent: document.getElementById('draft-progress-percent'),
+      draftProgressNote: document.getElementById('draft-progress-note'),
+      expressiveTagsMode: document.getElementById('expressive-tags-mode'),
+      vocalizationTagsMode: document.getElementById('vocalization-tags-mode'),
+      approvedForm: document.getElementById('approved-form'),
+      approvedFile: document.getElementById('approved-file'),
+      approvedFileSummary: document.getElementById('approved-file-summary'),
+      approvedFileTitle: document.getElementById('approved-file-title'),
+      approvedFileState: document.getElementById('approved-file-state'),
+      approvedFileChapters: document.getElementById('approved-file-chapters'),
+      approvedFileNote: document.getElementById('approved-file-note'),
+      chunkSize: document.getElementById('chunk-size'),
+      chunkSizeValue: document.getElementById('chunk-size-value'),
+      hardMaxChars: document.getElementById('hard-max-chars'),
+      hardMaxCharsValue: document.getElementById('hard-max-chars-value'),
+      voiceName: document.getElementById('voice-name'),
+      languageCode: document.getElementById('language-code'),
+      styleInstruction: document.getElementById('style-instruction'),
+      speechRate: document.getElementById('speech-rate'),
+      outputFormat: document.getElementById('output-format'),
+      audioQuality: document.getElementById('audio-quality'),
+      readChapterTitles: document.getElementById('read-chapter-titles'),
+      separatePreChapterText: document.getElementById('separate-pre-chapter-text'),
+      chapterList: document.getElementById('chapter-list'),
+      selectAllChapters: document.getElementById('select-all-chapters'),
+      clearAllChapters: document.getElementById('clear-all-chapters'),
+      chapterDownloads: document.getElementById('chapter-downloads'),
+      chapterDownloadList: document.getElementById('chapter-download-list'),
+      downloadAllLink: document.getElementById('download-all-link'),
+      audioButton: document.getElementById('audio-button'),
+      audioLink: document.getElementById('audio-link'),
+      taggingStatus: document.getElementById('tagging-status'),
+      audioStatus: document.getElementById('audio-status'),
+    };
+
+    async function fetchJson(url, options = {}) {
+      const response = await fetch(url, options);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.detail || 'Request failed');
+      }
+      return data;
+    }
+
+    function setStatus(element, message, success = false) {
+      element.textContent = message;
+      element.className = success ? 'status success' : 'status';
+    }
+
+    function formatModeLabel(mode) {
+      if (!mode) {
+        return 'Off';
+      }
+      return mode.charAt(0).toUpperCase() + mode.slice(1);
+    }
+
+    function describeDraftModes(source) {
+      const expressive = formatModeLabel(source?.expressive_mode || elements.expressiveTagsMode.value);
+      const vocalization = formatModeLabel(source?.vocalization_mode || elements.vocalizationTagsMode.value);
+      return `Expressive: ${expressive} · Vocalization: ${vocalization}`;
+    }
+
+    function getDefaultTaggingStatus(book) {
+      if (!book) {
+        return 'Waiting for the first upload.';
+      }
+      if (book.draft_annotation_url) {
+        return 'Draft annotation is ready to download.';
+      }
+      return 'Ready to generate an annotated DOCX.';
+    }
+
+    function getDefaultAudioStatus(book) {
+      if (!book) {
+        return 'Upload an approved annotated DOCX to continue.';
+      }
+      if (!book.has_approved_annotation) {
+        return 'Upload an approved annotated DOCX to continue.';
+      }
+      return 'Ready to generate chapter audio files.';
+    }
+
+    function stopDraftStatusPolling() {
+      if (state.draftStatusTimer) {
+        clearInterval(state.draftStatusTimer);
+        state.draftStatusTimer = null;
+      }
+    }
+
+    function renderDraftAnnotationProgress(status) {
+      const isVisible = Boolean(state.currentBook && status && status.state !== 'idle');
+      elements.draftProgress.hidden = !isVisible;
+      if (!isVisible) {
+        return;
+      }
+
+      const progressPercent = Math.max(0, Math.min(100, Number(status.progress_percent ?? 0)));
+      const chapterCount = Number(status.chapter_count ?? 0);
+      const chapterIndex = Number(status.chapter_index ?? 0);
+      const displayedChapterIndex = status.phase === 'Annotating chapters' && chapterCount > 0 && chapterIndex < chapterCount
+        ? chapterIndex + 1
+        : Math.min(chapterIndex, chapterCount);
+
+      elements.draftProgressTitle.textContent = 'Draft annotation progress';
+      elements.draftProgressState.textContent = status.state || 'Idle';
+      elements.draftProgressStep.textContent = status.step || 'Waiting to start.';
+      elements.draftProgressFill.style.width = `${progressPercent}%`;
+      elements.draftProgressCount.textContent = chapterCount > 0
+        ? `${displayedChapterIndex} / ${chapterCount} chapters`
+        : 'Counting chapters';
+      elements.draftProgressPercent.textContent = `${progressPercent}%`;
+      if (status.current_chapter_title) {
+        elements.draftProgressNote.textContent = `Current chapter: ${status.current_chapter_title}`;
+      } else if (status.provider) {
+        elements.draftProgressNote.textContent = `Provider: ${status.provider} · ${describeDraftModes(status)}`;
+      } else {
+        elements.draftProgressNote.textContent = 'Preparing annotation progress details.';
+      }
+    }
+
+    function formatDraftStatusMessage(status) {
+      if (!status) {
+        return '';
+      }
+      if (status.chapter_count && status.phase === 'Annotating chapters') {
+        const currentNumber = Math.min(Number(status.chapter_index || 0) + 1, Number(status.chapter_count));
+        return `${status.step} (${currentNumber}/${status.chapter_count})`;
+      }
+      return status.step || '';
+    }
+
+    function updateApprovedFileSummary(book) {
+      if (state.uploadingApprovedFile && state.pendingApprovedFileName) {
+        elements.approvedFileTitle.textContent = state.pendingApprovedFileName;
+        elements.approvedFileState.textContent = 'Uploading';
+        elements.approvedFileChapters.textContent = 'Pending';
+        elements.approvedFileNote.textContent = 'The approved annotation is being uploaded into the audiobook generator.';
+        return;
+      }
+
+      if (book?.has_approved_annotation) {
+        elements.approvedFileTitle.textContent = book.title;
+        elements.approvedFileState.textContent = 'Loaded';
+        elements.approvedFileChapters.textContent = `${book.chapter_count} chapters`;
+        elements.approvedFileNote.textContent = 'Approved annotation is loaded and ready for chunk preview or audio generation.';
+        return;
+      }
+
+      if (state.pendingApprovedFileName) {
+        elements.approvedFileTitle.textContent = state.pendingApprovedFileName;
+        elements.approvedFileState.textContent = 'Selected';
+        elements.approvedFileChapters.textContent = 'Pending';
+        elements.approvedFileNote.textContent = 'The selected approved annotation will upload immediately.';
+        return;
+      }
+
+      elements.approvedFileTitle.textContent = 'No approved annotation loaded';
+      elements.approvedFileState.textContent = 'Waiting';
+      elements.approvedFileChapters.textContent = '0 chapters';
+      elements.approvedFileNote.textContent = 'Select an approved annotated DOCX to load it into the audiobook generator.';
+    }
+
+    function getSelectedChapterIndexes() {
+      return Array.from(document.querySelectorAll('input[name="chapter-index"]:checked'))
+        .map((input) => Number(input.value))
+        .filter((value) => Number.isInteger(value));
+    }
+
+    function updateGenerateButtonState() {
+      const hasApprovedAnnotation = Boolean(state.currentBook?.has_approved_annotation);
+      elements.audioButton.disabled = !hasApprovedAnnotation || state.chapterPlanLoading || state.selectedChapterIndexes.length === 0;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function getActiveChapterProgress(chapterIndex) {
+      const status = state.audioGenerationStatus;
+      if (!status || status.state !== 'running' || status.active_chapter_index !== chapterIndex) {
+        return '';
+      }
+
+      const chunkLabel = status.chapter_chunk_count
+        ? `Chunk ${status.chapter_chunk_index || 0} of ${status.chapter_chunk_count}`
+        : status.step;
+      return `<div class="chapter-progress">${escapeHtml(chunkLabel)}</div>`;
+    }
+
+    function getChunkLimitPresets() {
+      return state.generatorOptions?.chunk_limit_presets || FALLBACK_CHUNK_LIMIT_PRESETS;
+    }
+
+    function getHardLimitOverflowPresets() {
+      return state.generatorOptions?.hard_limit_overflow_presets || FALLBACK_HARD_LIMIT_OVERFLOW_PRESETS;
+    }
+
+    function findClosestPresetIndex(value, presets) {
+      let closestIndex = 0;
+      let closestDistance = Number.POSITIVE_INFINITY;
+      presets.forEach((preset, index) => {
+        const distance = Math.abs(preset - value);
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestIndex = index;
+        }
+      });
+      return closestIndex;
+    }
+
+    function getChunkSizeValue() {
+      const presets = getChunkLimitPresets();
+      return presets[Number(elements.chunkSize.value)] ?? presets[0];
+    }
+
+    function getHardOverflowValue() {
+      const presets = getHardLimitOverflowPresets();
+      return presets[Number(elements.hardMaxChars.value)] ?? presets[0];
+    }
+
+    function getHardMaxCharsValue() {
+      return getChunkSizeValue() + getHardOverflowValue();
+    }
+
+    function syncChunkControlLabels() {
+      const chunkValue = getChunkSizeValue();
+      const hardOverflowValue = getHardOverflowValue();
+      const hardValue = chunkValue + hardOverflowValue;
+      elements.chunkSizeValue.textContent = `${chunkValue} characters`;
+      elements.hardMaxCharsValue.textContent = `${hardValue} characters (+${hardOverflowValue})`;
+    }
+
+    function configureChunkSliders() {
+      const chunkPresets = getChunkLimitPresets();
+      const hardOverflowPresets = getHardLimitOverflowPresets();
+      elements.chunkSize.max = String(Math.max(chunkPresets.length - 1, 0));
+      elements.hardMaxChars.max = String(Math.max(hardOverflowPresets.length - 1, 0));
+      if (!elements.chunkSize.value) {
+        elements.chunkSize.value = String(findClosestPresetIndex(500, chunkPresets));
+      }
+      if (!elements.hardMaxChars.value) {
+        elements.hardMaxChars.value = String(findClosestPresetIndex(150, hardOverflowPresets));
+      }
+      syncChunkControlLabels();
+    }
+
+    function populateGeneratorOptions(options) {
+      state.generatorOptions = options;
+      elements.voiceName.innerHTML = options.voices
+        .map((voice) => `<option value="${voice.name}">${voice.name} (${voice.gender}) - ${voice.description}</option>`)
+        .join('');
+      elements.languageCode.innerHTML = options.languages
+        .map((language) => `<option value="${language.code}">${language.label} (${language.code})</option>`)
+        .join('');
+      configureChunkSliders();
+    }
+
+    function applyGeneratorSettings(settings) {
+      if (!settings) {
+        return;
+      }
+      const chunkPresets = getChunkLimitPresets();
+      const hardOverflowPresets = getHardLimitOverflowPresets();
+      const maxChars = Number(settings.max_chars ?? 500);
+      const hardMaxChars = Number(settings.hard_max_chars ?? (maxChars + 100));
+      elements.chunkSize.value = String(findClosestPresetIndex(maxChars, chunkPresets));
+      elements.hardMaxChars.value = String(findClosestPresetIndex(Math.max(0, hardMaxChars - maxChars), hardOverflowPresets));
+      syncChunkControlLabels();
+      elements.voiceName.value = settings.voice_name ?? 'Schedar';
+      elements.languageCode.value = settings.language_code ?? 'en-US';
+      elements.styleInstruction.value = settings.style_instruction ?? DEFAULT_STYLE_INSTRUCTION;
+      elements.speechRate.value = settings.speech_rate ?? 1.05;
+      elements.readChapterTitles.checked = settings.read_chapter_titles ?? true;
+      elements.separatePreChapterText.checked = (settings.pre_chapter_text_mode ?? 'attach_to_chapter_1') === 'separate_chapter_0';
+      elements.outputFormat.value = settings.output_format ?? 'mp3';
+      elements.audioQuality.value = settings.audio_quality ?? 'best';
+    }
+
+    function renderGeneratedDownloads(audioGeneration) {
+      const generatedChapters = audioGeneration?.generated_chapters || [];
+      const hasDownloads = Boolean(audioGeneration?.download_url) || generatedChapters.length > 0;
+
+      if (!hasDownloads) {
+        elements.chapterDownloads.hidden = true;
+        elements.chapterDownloadList.innerHTML = '';
+        elements.downloadAllLink.hidden = true;
+        return;
+      }
+
+      elements.chapterDownloads.hidden = false;
+
+      if (audioGeneration?.download_url) {
+        elements.downloadAllLink.href = audioGeneration.download_url;
+        elements.downloadAllLink.hidden = false;
+        elements.downloadAllLink.textContent = 'Download all';
+      } else {
+        elements.downloadAllLink.hidden = true;
+      }
+
+      elements.chapterDownloadList.innerHTML = generatedChapters
+        .map((chapter) => `
+          <div class="chapter-download-item">
+            <div>
+              <div class="chapter-title">${chapter.chapter_title}</div>
+              <div class="chapter-meta">${chapter.file_name}</div>
+            </div>
+            <a class="download-link" href="${chapter.download_url}" download>Download chapter</a>
+          </div>
+        `)
+        .join('');
+    }
+
+    function renderChapterPlan(chapterPlan) {
+      state.chapterPlan = chapterPlan;
+      if (!chapterPlan.length) {
+        elements.chapterList.innerHTML = '<p class="section-copy">No approved chapter plan available yet.</p>';
+        elements.selectAllChapters.disabled = true;
+        elements.clearAllChapters.disabled = true;
+        state.selectedChapterIndexes = [];
+        state.chapterSelectionInitialized = false;
+        updateGenerateButtonState();
+        return;
+      }
+
+      if (!state.chapterSelectionInitialized) {
+        state.selectedChapterIndexes = chapterPlan.map((chapter) => chapter.chapter_index);
+        state.chapterSelectionInitialized = true;
+      } else {
+        const allowedIndexes = new Set(chapterPlan.map((chapter) => chapter.chapter_index));
+        state.selectedChapterIndexes = state.selectedChapterIndexes.filter((index) => allowedIndexes.has(index));
+      }
+
+      elements.chapterList.innerHTML = chapterPlan
+        .map((chapter) => {
+          const checked = state.selectedChapterIndexes.includes(chapter.chapter_index) ? 'checked' : '';
+          return `
+            <label class="chapter-item">
+              <input type="checkbox" name="chapter-index" value="${chapter.chapter_index}" ${checked}>
+              <div class="chapter-body">
+                <div class="chapter-title">${chapter.chapter_title}</div>
+                <div class="chapter-meta">Estimated chunks: ${chapter.estimated_chunk_count} · Characters: ${chapter.char_count}</div>
+                ${getActiveChapterProgress(chapter.chapter_index)}
+              </div>
+            </label>
+          `;
+        })
+        .join('');
+
+      document.querySelectorAll('input[name="chapter-index"]').forEach((input) => {
+        input.addEventListener('change', () => {
+          state.selectedChapterIndexes = getSelectedChapterIndexes();
+          updateGenerateButtonState();
+        });
+      });
+
+      elements.selectAllChapters.disabled = false;
+      elements.clearAllChapters.disabled = false;
+      updateGenerateButtonState();
+    }
+
+    async function refreshChapterPlan() {
+      if (!state.currentBook?.has_approved_annotation) {
+        renderChapterPlan([]);
+        return;
+      }
+
+      const requestToken = ++state.chapterPlanRequestToken;
+      state.chapterPlanLoading = true;
+      updateGenerateButtonState();
+      try {
+        const response = await fetchJson(`/api/books/${state.currentBook.id}/chunk-preview`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            max_chars: getChunkSizeValue(),
+            hard_max_chars: getHardMaxCharsValue(),
+            read_chapter_titles: elements.readChapterTitles.checked,
+            pre_chapter_text_mode: elements.separatePreChapterText.checked ? 'separate_chapter_0' : 'attach_to_chapter_1',
+          }),
+        });
+        const chunkCounts = new Map();
+        response.chunks.forEach((chunk) => {
+          chunkCounts.set(chunk.chapter_index, (chunkCounts.get(chunk.chapter_index) || 0) + 1);
+        });
+        const chapterPlan = (response.chapters || state.currentBook.chapters || []).map((chapter) => ({
+          ...chapter,
+          estimated_chunk_count: chunkCounts.get(chapter.chapter_index) || 0,
+        }));
+        if (requestToken !== state.chapterPlanRequestToken) {
+          return;
+        }
+        renderChapterPlan(chapterPlan);
+      } catch (error) {
+        if (requestToken !== state.chapterPlanRequestToken) {
+          return;
+        }
+        elements.chapterList.innerHTML = `<p class="section-copy">${error.message}</p>`;
+        state.selectedChapterIndexes = [];
+        state.chapterSelectionInitialized = false;
+        updateGenerateButtonState();
+      } finally {
+        if (requestToken === state.chapterPlanRequestToken) {
+          state.chapterPlanLoading = false;
+          updateGenerateButtonState();
+        }
+      }
+    }
+
+    function updateBookSummary(book) {
+      const previousBookId = state.currentBook?.id || null;
+      state.currentBook = book;
+
+      if (!book) {
+        state.draftAnnotationStatus = null;
+        state.audioGenerationStatus = null;
+        elements.currentBookTitle.textContent = 'No source book loaded';
+        elements.currentBookType.textContent = 'Source';
+        elements.currentBookState.textContent = 'Waiting';
+        elements.currentBookNote.textContent = 'Upload a file to start the workflow.';
+        elements.draftButton.disabled = true;
+        elements.draftLink.hidden = true;
+        elements.audioLink.hidden = true;
+        setStatus(elements.taggingStatus, getDefaultTaggingStatus(null));
+        setStatus(elements.audioStatus, getDefaultAudioStatus(null));
+        renderDraftAnnotationProgress(null);
+        updateApprovedFileSummary(null);
+        renderGeneratedDownloads(null);
+        renderChapterPlan([]);
+        stopDraftStatusPolling();
+        if (state.audioStatusTimer) {
+          clearInterval(state.audioStatusTimer);
+          state.audioStatusTimer = null;
+        }
+        return;
+      }
+
+      elements.currentBookTitle.textContent = book.title;
+      elements.currentBookType.textContent = book.source_type.toUpperCase();
+      elements.currentBookState.textContent = book.status;
+      elements.currentBookNote.textContent = `${book.source_filename || 'Unknown source file'} · ${book.chapter_count} chapters · ${book.paragraph_count} paragraphs`;
+  state.draftAnnotationStatus = book.draft_annotation_generation || null;
+      state.audioGenerationStatus = book.audio_generation || null;
+  renderDraftAnnotationProgress(state.draftAnnotationStatus);
+      updateApprovedFileSummary(book);
+      elements.audioLink.hidden = true;
+      elements.draftLink.hidden = true;
+      if (previousBookId !== book.id) {
+        renderGeneratedDownloads(null);
+        setStatus(elements.taggingStatus, getDefaultTaggingStatus(book));
+        setStatus(elements.audioStatus, getDefaultAudioStatus(book));
+      }
+      if (book.draft_annotation_expressive_mode) {
+        elements.expressiveTagsMode.value = book.draft_annotation_expressive_mode;
+      }
+      if (book.draft_annotation_vocalization_mode) {
+        elements.vocalizationTagsMode.value = book.draft_annotation_vocalization_mode;
+      }
+      applyGeneratorSettings(book.generator_settings);
+      if (Array.isArray(book.generator_settings?.chapter_indexes) && book.generator_settings.chapter_indexes.length) {
+        state.selectedChapterIndexes = book.generator_settings.chapter_indexes.slice();
+        state.chapterSelectionInitialized = true;
+      } else {
+        state.selectedChapterIndexes = [];
+        state.chapterSelectionInitialized = false;
+      }
+      elements.draftButton.disabled = false;
+      updateGenerateButtonState();
+      elements.draftLink.hidden = !book.draft_annotation_url;
+      if (book.draft_annotation_url) {
+        elements.draftLink.href = book.draft_annotation_url;
+      }
+      const draftGeneration = state.draftAnnotationStatus;
+      if (draftGeneration?.state === 'running' || draftGeneration?.state === 'queued') {
+        elements.draftButton.disabled = true;
+        setStatus(elements.taggingStatus, formatDraftStatusMessage(draftGeneration) || 'Generating annotated DOCX...');
+        startDraftStatusPolling();
+      } else {
+        stopDraftStatusPolling();
+      }
+      if (draftGeneration?.state === 'completed' && draftGeneration.download_url) {
+        elements.draftLink.href = draftGeneration.download_url;
+        elements.draftLink.hidden = false;
+        setStatus(elements.taggingStatus, `Annotated DOCX is ready using ${draftGeneration.provider}. ${describeDraftModes(draftGeneration)}.`, true);
+      } else if (draftGeneration?.state === 'error') {
+        setStatus(elements.taggingStatus, draftGeneration.step || 'Annotated DOCX generation failed.');
+      }
+      refreshChapterPlan();
+
+      const audioGeneration = book.audio_generation;
+      renderGeneratedDownloads(audioGeneration);
+      if (audioGeneration?.state === 'running' || audioGeneration?.state === 'queued') {
+        const chunkText = audioGeneration.chunk_count ? ` (${audioGeneration.chunk_index}/${audioGeneration.chunk_count})` : '';
+        setStatus(elements.audioStatus, `${audioGeneration.step}${chunkText}`);
+        renderChapterPlan(state.chapterPlan);
+        elements.audioButton.disabled = true;
+        startAudioStatusPolling();
+      }
+      if (audioGeneration?.state === 'completed' && audioGeneration.download_url) {
+        elements.audioLink.href = audioGeneration.download_url;
+        elements.audioLink.hidden = false;
+        return;
+      }
+      if (audioGeneration?.state === 'error') {
+        setStatus(elements.audioStatus, audioGeneration.step || 'Audio generation failed.');
+        return;
+      }
+      setStatus(elements.audioStatus, getDefaultAudioStatus(book));
+    }
+
+    async function refreshDraftAnnotationStatus() {
+      if (!state.currentBook) {
+        return;
+      }
+
+      try {
+        const status = await fetchJson(`/api/books/${state.currentBook.id}/draft-annotation-status`);
+        state.draftAnnotationStatus = status;
+        renderDraftAnnotationProgress(status);
+
+        if (status.state === 'running' || status.state === 'queued') {
+          elements.draftButton.disabled = true;
+          setStatus(elements.taggingStatus, formatDraftStatusMessage(status) || 'Generating annotated DOCX...');
+          return;
+        }
+
+        stopDraftStatusPolling();
+
+        if (status.state === 'completed' && status.download_url) {
+          elements.draftLink.href = status.download_url;
+          elements.draftLink.hidden = false;
+          setStatus(elements.taggingStatus, `Annotated DOCX is ready using ${status.provider}. ${describeDraftModes(status)}.`, true);
+          await loadCurrentBook();
+          return;
+        }
+
+        if (status.state === 'error') {
+          elements.draftButton.disabled = false;
+          setStatus(elements.taggingStatus, status.step || 'Annotated DOCX generation failed.');
+          return;
+        }
+
+        elements.draftButton.disabled = !state.currentBook;
+        setStatus(elements.taggingStatus, getDefaultTaggingStatus(state.currentBook));
+      } catch (error) {
+        stopDraftStatusPolling();
+        elements.draftButton.disabled = !state.currentBook;
+        setStatus(elements.taggingStatus, error.message);
+      }
+    }
+
+    function startDraftStatusPolling() {
+      stopDraftStatusPolling();
+      state.draftStatusTimer = setInterval(refreshDraftAnnotationStatus, 2000);
+    }
+
+    async function refreshAudioGenerationStatus() {
+      if (!state.currentBook) {
+        return;
+      }
+
+      try {
+        const status = await fetchJson(`/api/books/${state.currentBook.id}/audio-status`);
+        state.audioGenerationStatus = status;
+        if (status.state === 'running' || status.state === 'queued') {
+          const chunkText = status.chunk_count ? ` (${status.chunk_index}/${status.chunk_count})` : '';
+          setStatus(elements.audioStatus, `${status.step}${chunkText}`);
+          renderChapterPlan(state.chapterPlan);
+          elements.audioButton.disabled = true;
+          return;
+        }
+
+        if (state.audioStatusTimer) {
+          clearInterval(state.audioStatusTimer);
+          state.audioStatusTimer = null;
+        }
+
+        if (status.state === 'completed' && status.download_url) {
+          elements.audioLink.href = status.download_url;
+          elements.audioLink.hidden = false;
+          renderGeneratedDownloads(status);
+          renderChapterPlan(state.chapterPlan);
+          updateGenerateButtonState();
+          setStatus(elements.audioStatus, `Generated ${status.file_name} at ${status.speech_rate}x speed.`, true);
+          await loadCurrentBook();
+          return;
+        }
+
+        if (status.state === 'error') {
+          renderChapterPlan(state.chapterPlan);
+          updateGenerateButtonState();
+          setStatus(elements.audioStatus, status.step || 'Audio generation failed.');
+          return;
+        }
+
+        renderChapterPlan(state.chapterPlan);
+        updateGenerateButtonState();
+      } catch (error) {
+        if (state.audioStatusTimer) {
+          clearInterval(state.audioStatusTimer);
+          state.audioStatusTimer = null;
+        }
+        updateGenerateButtonState();
+        setStatus(elements.audioStatus, error.message);
+      }
+    }
+
+    function startAudioStatusPolling() {
+      if (state.audioStatusTimer) {
+        clearInterval(state.audioStatusTimer);
+      }
+      state.audioStatusTimer = setInterval(refreshAudioGenerationStatus, 2000);
+    }
+
+    async function loadCurrentBook() {
+      const books = await fetchJson('/api/books');
+      if (!books.length) {
+        updateBookSummary(null);
+        return;
+      }
+
+      const latestBook = await fetchJson(`/api/books/${books[0].id}`);
+      updateBookSummary(latestBook);
+    }
+
+    async function generateAudioFile() {
+      if (!state.currentBook) {
+        return;
+      }
+
+      await refreshChapterPlan();
+      state.selectedChapterIndexes = getSelectedChapterIndexes();
+      if (!state.selectedChapterIndexes.length) {
+        updateGenerateButtonState();
+        setStatus(elements.audioStatus, 'Select at least one chapter before generating audio.');
+        return;
+      }
+
+      elements.audioButton.disabled = true;
+      elements.audioLink.hidden = true;
+      setStatus(elements.audioStatus, 'Queued chapter audio generation...');
+      try {
+        const result = await fetchJson(`/api/books/${state.currentBook.id}/generate-book-audio`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            max_chars: getChunkSizeValue(),
+            hard_max_chars: getHardMaxCharsValue(),
+            read_chapter_titles: elements.readChapterTitles.checked,
+            pre_chapter_text_mode: elements.separatePreChapterText.checked ? 'separate_chapter_0' : 'attach_to_chapter_1',
+            voice_name: elements.voiceName.value,
+            language_code: elements.languageCode.value,
+            style_instruction: elements.styleInstruction.value.trim() || DEFAULT_STYLE_INSTRUCTION,
+            speech_rate: Number(elements.speechRate.value) || 1.05,
+            output_format: elements.outputFormat.value,
+            audio_quality: elements.audioQuality.value,
+            chapter_indexes: state.selectedChapterIndexes,
+          }),
+        });
+        state.audioGenerationStatus = { state: 'queued', step: result.step, chunk_index: 0, chunk_count: 0 };
+        setStatus(elements.audioStatus, `${result.step} chapter audio generation...`);
+        renderChapterPlan(state.chapterPlan);
+        startAudioStatusPolling();
+      } catch (error) {
+        try {
+          const status = await fetchJson(`/api/books/${state.currentBook.id}/audio-status`);
+          state.audioGenerationStatus = status;
+          if (status.state === 'running' || status.state === 'queued') {
+            const chunkText = status.chunk_count ? ` (${status.chunk_index}/${status.chunk_count})` : '';
+            setStatus(elements.audioStatus, `${status.step}${chunkText}`);
+            renderChapterPlan(state.chapterPlan);
+            elements.audioButton.disabled = true;
+            startAudioStatusPolling();
+            return;
+          }
+          if (status.state === 'error') {
+            updateGenerateButtonState();
+            setStatus(elements.audioStatus, status.step || error.message);
+            return;
+          }
+        } catch {
+        }
+        updateGenerateButtonState();
+        setStatus(elements.audioStatus, error.message);
+      }
+    }
+
+    async function uploadApprovedFile() {
+      if (!elements.approvedFile.files.length || state.uploadingApprovedFile) {
+        return;
+      }
+
+      state.uploadingApprovedFile = true;
+      state.pendingApprovedFileName = elements.approvedFile.files[0].name;
+      updateApprovedFileSummary(state.currentBook);
+      const formData = new FormData();
+      formData.append('file', elements.approvedFile.files[0]);
+      setStatus(elements.audioStatus, 'Uploading approved annotated DOCX...');
+
+      try {
+        if (state.currentBook) {
+          await fetchJson(`/api/books/${state.currentBook.id}/approved-annotation`, {
+            method: 'POST',
+            body: formData,
+          });
+        } else {
+          const book = await fetchJson('/api/upload-approved-annotation', {
+            method: 'POST',
+            body: formData,
+          });
+          updateBookSummary(book);
+        }
+        elements.approvedFile.value = '';
+        state.pendingApprovedFileName = '';
+        setStatus(elements.audioStatus, 'Approved annotated DOCX saved.', true);
+        await loadCurrentBook();
+      } catch (error) {
+        setStatus(elements.audioStatus, error.message);
+      } finally {
+        state.uploadingApprovedFile = false;
+        updateApprovedFileSummary(state.currentBook);
+      }
+    }
+
+    async function initApp() {
+      try {
+        const options = await fetchJson('/api/generator-options');
+        populateGeneratorOptions(options);
+        applyGeneratorSettings(options.default_settings);
+      } catch (error) {
+        setStatus(elements.audioStatus, error.message);
+      }
+    }
+
+    elements.uploadForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!elements.sourceFile.files.length) {
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', elements.sourceFile.files[0]);
+      setStatus(elements.taggingStatus, 'Uploading and extracting...');
+
+      try {
+        const book = await fetchJson('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        setStatus(elements.taggingStatus, `Imported ${book.title}.`, true);
+        elements.sourceFile.value = '';
+        elements.audioLink.hidden = true;
+        setStatus(elements.audioStatus, 'Upload an approved annotated DOCX to continue.');
+        await loadCurrentBook();
+      } catch (error) {
+        setStatus(elements.taggingStatus, error.message);
+      }
+    });
+
+    elements.approvedFile.addEventListener('change', () => {
+      state.pendingApprovedFileName = elements.approvedFile.files[0]?.name || '';
+      updateApprovedFileSummary(state.currentBook);
+      uploadApprovedFile();
+    });
+
+    elements.chunkSize.addEventListener('input', syncChunkControlLabels);
+    elements.chunkSize.addEventListener('change', refreshChapterPlan);
+    elements.hardMaxChars.addEventListener('input', syncChunkControlLabels);
+    elements.hardMaxChars.addEventListener('change', refreshChapterPlan);
+    elements.readChapterTitles.addEventListener('change', refreshChapterPlan);
+    elements.separatePreChapterText.addEventListener('change', () => {
+      state.chapterSelectionInitialized = false;
+      refreshChapterPlan();
+    });
+
+    elements.selectAllChapters.addEventListener('click', () => {
+      state.selectedChapterIndexes = state.chapterPlan.map((chapter) => chapter.chapter_index);
+      state.chapterSelectionInitialized = true;
+      renderChapterPlan(state.chapterPlan);
+    });
+
+    elements.clearAllChapters.addEventListener('click', () => {
+      state.selectedChapterIndexes = [];
+      state.chapterSelectionInitialized = true;
+      renderChapterPlan(state.chapterPlan);
+    });
+
+    elements.draftButton.addEventListener('click', async () => {
+      if (!state.currentBook) {
+        return;
+      }
+
+      elements.draftButton.disabled = true;
+      elements.draftLink.hidden = true;
+      state.draftAnnotationStatus = {
+        state: 'queued',
+        phase: 'Queued',
+        step: 'Queued',
+        chapter_index: 0,
+        chapter_count: 0,
+        current_chapter_title: null,
+        provider: null,
+        expressive_mode: elements.expressiveTagsMode.value,
+        vocalization_mode: elements.vocalizationTagsMode.value,
+        progress_percent: 0,
+        download_url: null,
+      };
+      renderDraftAnnotationProgress(state.draftAnnotationStatus);
+      setStatus(elements.taggingStatus, 'Queued annotated DOCX generation...');
+      try {
+        await fetchJson(`/api/books/${state.currentBook.id}/draft-annotation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            expressive_mode: elements.expressiveTagsMode.value,
+            vocalization_mode: elements.vocalizationTagsMode.value,
+          }),
+        });
+        startDraftStatusPolling();
+        await refreshDraftAnnotationStatus();
+      } catch (error) {
+        elements.draftButton.disabled = false;
+        setStatus(elements.taggingStatus, error.message);
+        renderDraftAnnotationProgress(state.draftAnnotationStatus);
+      }
+    });
+
+    elements.approvedForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+    });
+
+    elements.audioButton.addEventListener('click', generateAudioFile);
+
+    configureChunkSliders();
+    updateBookSummary(null);
+    initApp();
+  </script>
+</body>
+</html>
