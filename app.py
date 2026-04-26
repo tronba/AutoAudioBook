@@ -2323,6 +2323,24 @@ def serialize_book(row: sqlite3.Row) -> dict[str, Any]:
 
 def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -> None:
     generated_chapters: list[dict[str, Any]] = []
+
+    def build_audio_status_payload(**extra: Any) -> dict[str, Any]:
+        payload = {
+            "download_url": None,
+            "file_name": None,
+            "speech_rate": request.speech_rate,
+            "voice_name": request.voice_name,
+            "language_code": request.language_code,
+            "style_instruction": request.style_instruction,
+            "output_format": request.output_format,
+            "audio_quality": request.audio_quality,
+            "selected_chapter_indexes": extra.get("selected_chapter_indexes"),
+            "generated_chapters": list(generated_chapters),
+            "updated_at": now_iso(),
+        }
+        payload.update(extra)
+        return payload
+
     try:
         book = get_book_or_404(book_id)
         extracted = read_json(Path(book["extracted_path"]))
@@ -2348,23 +2366,14 @@ def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -
 
         write_audio_generation_status(
             book_id,
-            {
-                "state": "running",
-                "step": "Verifying transcript coverage",
-                "chunk_index": 0,
-                "chunk_count": len(chunks),
-                "download_url": None,
-                "file_name": None,
-                "speech_rate": request.speech_rate,
-                "voice_name": request.voice_name,
-                "language_code": request.language_code,
-                "style_instruction": request.style_instruction,
-                "hard_max_chars": request.hard_max_chars,
-                "output_format": request.output_format,
-                "audio_quality": request.audio_quality,
-                "selected_chapter_indexes": selected_chapter_indexes,
-                "updated_at": now_iso(),
-            },
+            build_audio_status_payload(
+                state="running",
+                step="Verifying transcript coverage",
+                chunk_index=0,
+                chunk_count=len(chunks),
+                hard_max_chars=request.hard_max_chars,
+                selected_chapter_indexes=selected_chapter_indexes,
+            ),
         )
         coverage_audit = audit_prepared_transcript_coverage(
             annotations.title,
@@ -2375,24 +2384,15 @@ def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -
 
         write_audio_generation_status(
             book_id,
-            {
-                "state": "running",
-                "step": "Preparing audiobook generation",
-                "chunk_index": 0,
-                "chunk_count": len(chunks),
-                "download_url": None,
-                "file_name": None,
-                "speech_rate": request.speech_rate,
-                "voice_name": request.voice_name,
-                "language_code": request.language_code,
-                "style_instruction": request.style_instruction,
-                "hard_max_chars": request.hard_max_chars,
-                "output_format": request.output_format,
-                "audio_quality": request.audio_quality,
-                "selected_chapter_indexes": selected_chapter_indexes,
-                "coverage_check": coverage_audit,
-                "updated_at": now_iso(),
-            },
+            build_audio_status_payload(
+                state="running",
+                step="Preparing audiobook generation",
+                chunk_index=0,
+                chunk_count=len(chunks),
+                hard_max_chars=request.hard_max_chars,
+                selected_chapter_indexes=selected_chapter_indexes,
+                coverage_check=coverage_audit,
+            ),
         )
 
         chapter_audio: dict[int, list[bytes]] = {}
@@ -2409,21 +2409,17 @@ def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -
             chapter_chunk_positions[chapter_index] = chapter_chunk_positions.get(chapter_index, 0) + 1
             write_audio_generation_status(
                 book_id,
-                {
-                    "state": "running",
-                    "step": f"Generating chunk {position} of {len(chunks)}",
-                    "chunk_index": position,
-                    "chunk_count": len(chunks),
-                    "active_chapter_index": chapter_index,
-                    "active_chapter_title": chunk["chapter_title"],
-                    "chapter_chunk_index": chapter_chunk_positions[chapter_index],
-                    "chapter_chunk_count": chapter_chunk_totals.get(chapter_index, 0),
-                    "download_url": None,
-                    "file_name": None,
-                    "speech_rate": request.speech_rate,
-                    "voice_name": request.voice_name,
-                    "updated_at": now_iso(),
-                },
+                build_audio_status_payload(
+                    state="running",
+                    step=f"Generating chunk {position} of {len(chunks)}",
+                    chunk_index=position,
+                    chunk_count=len(chunks),
+                    active_chapter_index=chapter_index,
+                    active_chapter_title=chunk["chapter_title"],
+                    chapter_chunk_index=chapter_chunk_positions[chapter_index],
+                    chapter_chunk_count=chapter_chunk_totals.get(chapter_index, 0),
+                    selected_chapter_indexes=selected_chapter_indexes,
+                ),
             )
 
             segments = [SegmentAnnotation.model_validate(segment) for segment in chunk["segments"]]
@@ -2438,27 +2434,18 @@ def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -
             def on_retry(next_attempt: int, max_attempts: int, reason: str) -> None:
                 write_audio_generation_status(
                     book_id,
-                    {
-                        "state": "running",
-                        "step": f"Retrying chunk {position} of {len(chunks)}: attempt {next_attempt}/{max_attempts}",
-                        "chunk_index": position,
-                        "chunk_count": len(chunks),
-                        "active_chapter_index": chapter_index,
-                        "active_chapter_title": chunk["chapter_title"],
-                        "chapter_chunk_index": chapter_chunk_positions[chapter_index],
-                        "chapter_chunk_count": chapter_chunk_totals.get(chapter_index, 0),
-                        "download_url": None,
-                        "file_name": None,
-                        "speech_rate": request.speech_rate,
-                        "voice_name": request.voice_name,
-                        "language_code": request.language_code,
-                        "style_instruction": request.style_instruction,
-                        "output_format": request.output_format,
-                        "audio_quality": request.audio_quality,
-                        "selected_chapter_indexes": selected_chapter_indexes,
-                        "retry_reason": reason,
-                        "updated_at": now_iso(),
-                    },
+                    build_audio_status_payload(
+                        state="running",
+                        step=f"Retrying chunk {position} of {len(chunks)}: attempt {next_attempt}/{max_attempts}",
+                        chunk_index=position,
+                        chunk_count=len(chunks),
+                        active_chapter_index=chapter_index,
+                        active_chapter_title=chunk["chapter_title"],
+                        chapter_chunk_index=chapter_chunk_positions[chapter_index],
+                        chapter_chunk_count=chapter_chunk_totals.get(chapter_index, 0),
+                        selected_chapter_indexes=selected_chapter_indexes,
+                        retry_reason=reason,
+                    ),
                 )
 
             audio_bytes, sample_rate, attempts_used = synthesize_chunk_audio_with_gemini(
@@ -2477,27 +2464,17 @@ def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -
             if chapter_chunk_positions[chapter_index] == chapter_chunk_totals.get(chapter_index, 0):
                 write_audio_generation_status(
                     book_id,
-                    {
-                        "state": "running",
-                        "step": f"Finalizing chapter {chapter_index + 1}",
-                        "chunk_index": position,
-                        "chunk_count": len(chunks),
-                        "active_chapter_index": chapter_index,
-                        "active_chapter_title": chunk["chapter_title"],
-                        "chapter_chunk_index": chapter_chunk_positions[chapter_index],
-                        "chapter_chunk_count": chapter_chunk_totals.get(chapter_index, 0),
-                        "download_url": None,
-                        "file_name": None,
-                        "speech_rate": request.speech_rate,
-                        "voice_name": request.voice_name,
-                        "language_code": request.language_code,
-                        "style_instruction": request.style_instruction,
-                        "output_format": request.output_format,
-                        "audio_quality": request.audio_quality,
-                        "selected_chapter_indexes": selected_chapter_indexes,
-                        "generated_chapters": generated_chapters,
-                        "updated_at": now_iso(),
-                    },
+                    build_audio_status_payload(
+                        state="running",
+                        step=f"Finalizing chapter {chapter_index + 1}",
+                        chunk_index=position,
+                        chunk_count=len(chunks),
+                        active_chapter_index=chapter_index,
+                        active_chapter_title=chunk["chapter_title"],
+                        chapter_chunk_index=chapter_chunk_positions[chapter_index],
+                        chapter_chunk_count=chapter_chunk_totals.get(chapter_index, 0),
+                        selected_chapter_indexes=selected_chapter_indexes,
+                    ),
                 )
                 chapter_output_path = materialize_chapter_audio_output(
                     book_id,
@@ -2526,23 +2503,13 @@ def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -
 
         write_audio_generation_status(
             book_id,
-            {
-                "state": "running",
-                "step": "Merging audio chunks",
-                "chunk_index": len(chunks),
-                "chunk_count": len(chunks),
-                "download_url": None,
-                "file_name": None,
-                "speech_rate": request.speech_rate,
-                "voice_name": request.voice_name,
-                "language_code": request.language_code,
-                "style_instruction": request.style_instruction,
-                "output_format": request.output_format,
-                "audio_quality": request.audio_quality,
-                "selected_chapter_indexes": selected_chapter_indexes,
-                "generated_chapters": generated_chapters,
-                "updated_at": now_iso(),
-            },
+            build_audio_status_payload(
+                state="running",
+                step="Merging audio chunks",
+                chunk_index=len(chunks),
+                chunk_count=len(chunks),
+                selected_chapter_indexes=selected_chapter_indexes,
+            ),
         )
 
         if len(chapter_output_paths) == 1:
@@ -2550,22 +2517,13 @@ def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -
         else:
             write_audio_generation_status(
                 book_id,
-                {
-                    "state": "running",
-                    "step": "Packaging chapter MP3 files",
-                    "chunk_index": len(chunks),
-                    "chunk_count": len(chunks),
-                    "download_url": None,
-                    "file_name": None,
-                    "speech_rate": request.speech_rate,
-                    "voice_name": request.voice_name,
-                    "language_code": request.language_code,
-                    "style_instruction": request.style_instruction,
-                    "output_format": request.output_format,
-                    "audio_quality": request.audio_quality,
-                    "selected_chapter_indexes": selected_chapter_indexes,
-                    "updated_at": now_iso(),
-                },
+                build_audio_status_payload(
+                    state="running",
+                    step="Packaging chapter MP3 files",
+                    chunk_index=len(chunks),
+                    chunk_count=len(chunks),
+                    selected_chapter_indexes=selected_chapter_indexes,
+                ),
             )
             final_download_path = build_audio_zip_path(book_id, request.voice_name, request.speech_rate, request.output_format)
             with zipfile.ZipFile(final_download_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -2574,24 +2532,16 @@ def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -
 
         write_audio_generation_status(
             book_id,
-            {
-                "state": "completed",
-                "step": "Completed",
-                "chunk_index": len(chunks),
-                "chunk_count": len(chunks),
-                "download_url": f"/files/audio/{book_id}/{final_download_path.name}",
-                "file_name": final_download_path.name,
-                "speech_rate": request.speech_rate,
-                "voice_name": request.voice_name,
-                "language_code": request.language_code,
-                "style_instruction": request.style_instruction,
-                "output_format": request.output_format,
-                "audio_quality": request.audio_quality,
-                "selected_chapter_indexes": selected_chapter_indexes,
-                "generated_chapters": generated_chapters,
-                "coverage_check": coverage_audit,
-                "updated_at": now_iso(),
-            },
+            build_audio_status_payload(
+                state="completed",
+                step="Completed",
+                chunk_index=len(chunks),
+                chunk_count=len(chunks),
+                download_url=f"/files/audio/{book_id}/{final_download_path.name}",
+                file_name=final_download_path.name,
+                selected_chapter_indexes=selected_chapter_indexes,
+                coverage_check=coverage_audit,
+            ),
         )
     except Exception as exc:
         detail = exc.detail if isinstance(exc, HTTPException) else str(exc)

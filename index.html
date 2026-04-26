@@ -339,6 +339,13 @@
       text-decoration: underline;
     }
 
+      .download-link.disabled {
+        color: var(--muted);
+        opacity: 0.65;
+        pointer-events: none;
+        text-decoration: none;
+      }
+
     .mono-note {
       font-family: var(--mono);
       font-size: 0.84rem;
@@ -409,6 +416,21 @@
       display: grid;
       gap: 4px;
     }
+
+      .chapter-row-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .chapter-row-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
 
     .chapter-meta {
       color: var(--muted);
@@ -1066,12 +1088,17 @@
 
     function renderGeneratedDownloads(audioGeneration) {
       const generatedChapters = audioGeneration?.generated_chapters || [];
-      const hasDownloads = Boolean(audioGeneration?.download_url) || generatedChapters.length > 0;
+      const isActiveGeneration = audioGeneration?.state === 'running' || audioGeneration?.state === 'queued';
+      const shouldShowPanel = Boolean(audioGeneration?.download_url) || generatedChapters.length > 0 || isActiveGeneration;
 
-      if (!hasDownloads) {
+      if (!shouldShowPanel) {
         elements.chapterDownloads.hidden = true;
         elements.chapterDownloadList.innerHTML = '';
         elements.downloadAllLink.hidden = true;
+        elements.downloadAllLink.classList.remove('disabled');
+        elements.downloadAllLink.removeAttribute('aria-disabled');
+        elements.downloadAllLink.removeAttribute('tabindex');
+        elements.downloadAllLink.removeAttribute('href');
         return;
       }
 
@@ -1081,21 +1108,38 @@
         elements.downloadAllLink.href = audioGeneration.download_url;
         elements.downloadAllLink.hidden = false;
         elements.downloadAllLink.textContent = 'Download all';
+        elements.downloadAllLink.classList.remove('disabled');
+        elements.downloadAllLink.removeAttribute('aria-disabled');
+        elements.downloadAllLink.removeAttribute('tabindex');
       } else {
-        elements.downloadAllLink.hidden = true;
+        elements.downloadAllLink.hidden = false;
+        elements.downloadAllLink.textContent = 'Download all';
+        elements.downloadAllLink.classList.add('disabled');
+        elements.downloadAllLink.setAttribute('aria-disabled', 'true');
+        elements.downloadAllLink.setAttribute('tabindex', '-1');
+        elements.downloadAllLink.removeAttribute('href');
       }
 
-      elements.chapterDownloadList.innerHTML = generatedChapters
-        .map((chapter) => `
-          <div class="chapter-download-item">
-            <div>
-              <div class="chapter-title">${chapter.chapter_title}</div>
-              <div class="chapter-meta">${chapter.file_name}</div>
-            </div>
-            <a class="download-link" href="${chapter.download_url}" download>Download chapter</a>
-          </div>
-        `)
-        .join('');
+      elements.chapterDownloadList.innerHTML = '';
+    }
+
+    function getGeneratedChapterMap() {
+      const generatedChapters = state.audioGenerationStatus?.generated_chapters || [];
+      return new Map(generatedChapters.map((chapter) => [chapter.chapter_index, chapter]));
+    }
+
+    function getChapterDownloadMarkup(chapterIndex) {
+      const chapterDownload = getGeneratedChapterMap().get(chapterIndex);
+      if (!chapterDownload) {
+        return '';
+      }
+
+      return `
+        <div class="chapter-row-actions">
+          <div class="chapter-meta">${escapeHtml(chapterDownload.file_name)}</div>
+          <a class="download-link" href="${chapterDownload.download_url}" download>Download chapter</a>
+        </div>
+      `;
     }
 
     function renderChapterPlan(chapterPlan) {
@@ -1125,7 +1169,10 @@
             <label class="chapter-item">
               <input type="checkbox" name="chapter-index" value="${chapter.chapter_index}" ${checked}>
               <div class="chapter-body">
-                <div class="chapter-title">${chapter.chapter_title}</div>
+                <div class="chapter-row-head">
+                  <div class="chapter-title">${chapter.chapter_title}</div>
+                  ${getChapterDownloadMarkup(chapter.chapter_index)}
+                </div>
                 <div class="chapter-meta">Estimated chunks: ${chapter.estimated_chunk_count} · Characters: ${chapter.char_count}</div>
                 ${getActiveChapterProgress(chapter.chapter_index)}
               </div>
@@ -1349,6 +1396,7 @@
       try {
         const status = await fetchJson(`/api/books/${state.currentBook.id}/audio-status`);
         state.audioGenerationStatus = status;
+        renderGeneratedDownloads(status);
         if (status.state === 'running' || status.state === 'queued') {
           const chunkText = status.chunk_count ? ` (${status.chunk_index}/${status.chunk_count})` : '';
           setStatus(elements.audioStatus, `${status.step}${chunkText}`);
@@ -1444,8 +1492,16 @@
             chapter_indexes: state.selectedChapterIndexes,
           }),
         });
-        state.audioGenerationStatus = { state: 'queued', step: result.step, chunk_index: 0, chunk_count: 0 };
+        state.audioGenerationStatus = {
+          state: 'queued',
+          step: result.step,
+          chunk_index: 0,
+          chunk_count: 0,
+          selected_chapter_indexes: state.selectedChapterIndexes,
+          generated_chapters: [],
+        };
         setStatus(elements.audioStatus, `${result.step} chapter audio generation...`);
+        renderGeneratedDownloads(state.audioGenerationStatus);
         renderChapterPlan(state.chapterPlan);
         startAudioStatusPolling();
       } catch (error) {
