@@ -454,6 +454,17 @@
       white-space: nowrap;
     }
 
+    .quota-warning {
+      color: #b42318;
+      font-size: 0.86rem;
+      font-weight: 700;
+      min-height: 1.2em;
+    }
+
+    .quota-warning:empty {
+      display: none;
+    }
+
     .upload-hint {
       margin-top: -4px;
       color: var(--muted);
@@ -722,6 +733,11 @@
                 <option value="standard">Standard</option>
               </select>
             </label>
+
+            <label>
+              Request limit per day
+              <input type="number" id="request-limit-per-day" min="1" max="100000" step="1" value="100">
+            </label>
           </div>
         </div>
 
@@ -752,6 +768,7 @@
           <button type="button" class="secondary" id="select-all-chapters" disabled>Select all</button>
           <button type="button" class="secondary" id="clear-all-chapters" disabled>Clear all</button>
         </div>
+        <div class="quota-warning" id="request-limit-warning" aria-live="polite"></div>
 
         <div class="chapter-list" id="chapter-list">
           <p class="section-copy">Upload an approved annotated DOCX to load the chapter list.</p>
@@ -835,9 +852,11 @@
       speechRate: document.getElementById('speech-rate'),
       outputFormat: document.getElementById('output-format'),
       audioQuality: document.getElementById('audio-quality'),
+      requestLimitPerDay: document.getElementById('request-limit-per-day'),
       readChapterTitles: document.getElementById('read-chapter-titles'),
       separatePreChapterText: document.getElementById('separate-pre-chapter-text'),
       chapterList: document.getElementById('chapter-list'),
+      requestLimitWarning: document.getElementById('request-limit-warning'),
       selectAllChapters: document.getElementById('select-all-chapters'),
       clearAllChapters: document.getElementById('clear-all-chapters'),
       chapterDownloads: document.getElementById('chapter-downloads'),
@@ -982,9 +1001,38 @@
         .filter((value) => Number.isInteger(value));
     }
 
+    function getRequestLimitPerDay() {
+      const value = Number(elements.requestLimitPerDay.value);
+      return Number.isFinite(value) && value > 0 ? Math.floor(value) : 100;
+    }
+
+    function getSelectedChunkTotal() {
+      const selectedIndexes = new Set(state.selectedChapterIndexes);
+      return state.chapterPlan.reduce((total, chapter) => {
+        if (!selectedIndexes.has(chapter.chapter_index)) {
+          return total;
+        }
+        return total + Number(chapter.estimated_chunk_count || 0);
+      }, 0);
+    }
+
+    function updateRequestLimitWarning() {
+      if (!elements.requestLimitWarning) {
+        return;
+      }
+      const selectedChunks = getSelectedChunkTotal();
+      const requestLimit = getRequestLimitPerDay();
+      if (selectedChunks > requestLimit) {
+        elements.requestLimitWarning.textContent = `Selected chapters are estimated at ${selectedChunks} TTS requests, which is ${selectedChunks - requestLimit} over the daily request limit of ${requestLimit}. Generate fewer chapters or continue after the quota resets.`;
+        return;
+      }
+      elements.requestLimitWarning.textContent = '';
+    }
+
     function updateGenerateButtonState() {
       const hasApprovedAnnotation = Boolean(state.currentBook?.has_approved_annotation);
       elements.audioButton.disabled = !hasApprovedAnnotation || state.chapterPlanLoading || state.selectedChapterIndexes.length === 0;
+      updateRequestLimitWarning();
     }
 
     function escapeHtml(value) {
@@ -1095,6 +1143,8 @@
       elements.separatePreChapterText.checked = (settings.pre_chapter_text_mode ?? 'attach_to_chapter_1') === 'separate_chapter_0';
       elements.outputFormat.value = settings.output_format ?? 'mp3';
       elements.audioQuality.value = settings.audio_quality ?? 'best';
+      elements.requestLimitPerDay.value = settings.request_limit_per_day ?? 100;
+      updateRequestLimitWarning();
     }
 
     function renderGeneratedDownloads(audioGeneration) {
@@ -1159,6 +1209,7 @@
         elements.clearAllChapters.disabled = true;
         state.selectedChapterIndexes = [];
         state.chapterSelectionInitialized = false;
+        updateRequestLimitWarning();
         updateGenerateButtonState();
         return;
       }
@@ -1501,6 +1552,7 @@
             speech_rate: Number(elements.speechRate.value) || 1.05,
             output_format: elements.outputFormat.value,
             audio_quality: elements.audioQuality.value,
+            request_limit_per_day: getRequestLimitPerDay(),
             chapter_indexes: state.selectedChapterIndexes,
           }),
         });
@@ -1622,6 +1674,8 @@
     elements.chunkSize.addEventListener('change', refreshChapterPlan);
     elements.hardMaxChars.addEventListener('input', syncChunkControlLabels);
     elements.hardMaxChars.addEventListener('change', refreshChapterPlan);
+    elements.requestLimitPerDay.addEventListener('input', updateRequestLimitWarning);
+    elements.requestLimitPerDay.addEventListener('change', updateRequestLimitWarning);
     elements.readChapterTitles.addEventListener('change', refreshChapterPlan);
     elements.separatePreChapterText.addEventListener('change', () => {
       state.chapterSelectionInitialized = false;

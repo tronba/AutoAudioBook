@@ -62,6 +62,12 @@ sudo journalctl -u autoaudiobook -n 100 --no-pager
 - Text before the first Chapter 1 marker is included in Chapter 1 by default
 - That opening text can be split out instead if you enable the separate pre-chapter text option during generation
 
+## Gemini TTS quota notes
+
+Gemini TTS usually has request quotas. For example, a project may be limited to a fixed number of TTS generation requests per day for a given model. In AutoAudioBook, each audio chunk is one Gemini TTS request, so a full book can easily need more requests than the daily quota allows.
+
+Expect full books to be generated over several days unless your Gemini quota is high enough. The audiobook generator includes a `Request limit per day` field, defaulting to `100`, and warns when the selected chapters are estimated to exceed that many chunks.
+
 ## Tag configuration
 
 Editable inline tag vocabulary lives in `tts_tags.toml`.

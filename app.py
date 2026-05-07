@@ -54,6 +54,7 @@ DEFAULT_GEMINI_TEXT_MODEL = "gemini-2.5-flash"
 DEFAULT_GEMINI_TTS_MODEL = "gemini-3.1-flash-tts-preview"
 DEFAULT_ANNOTATION_BATCH_MAX_SEGMENTS = 45
 DEFAULT_ANNOTATION_BATCH_MAX_CHARS = 12000
+DEFAULT_TTS_REQUEST_LIMIT_PER_DAY = 100
 CHUNK_TARGET_PRESETS = [100, 200, 300, 400, 500, 650, 800, 1000, 1250, 1500]
 CHUNK_HARD_OVERFLOW_PRESETS = [0, 25, 50, 75, 100, 150, 200, 300, 400, 500]
 DEFAULT_MAX_CHARS = 500
@@ -892,6 +893,7 @@ class GenerateBookAudioRequest(BaseModel):
     speech_rate: float = Field(default=DEFAULT_AUDIO_SPEED, ge=0.8, le=1.5)
     output_format: AudioOutputFormat = "mp3"
     audio_quality: AudioQualityPreset = "best"
+    request_limit_per_day: int = Field(default=DEFAULT_TTS_REQUEST_LIMIT_PER_DAY, ge=1, le=100000)
     chapter_indexes: list[int] | None = None
 
 
@@ -940,6 +942,7 @@ def build_default_generator_settings() -> dict[str, Any]:
         "pre_chapter_text_mode": "attach_to_chapter_1",
         "output_format": "mp3",
         "audio_quality": "best",
+        "request_limit_per_day": DEFAULT_TTS_REQUEST_LIMIT_PER_DAY,
         "chapter_indexes": [],
     }
 
@@ -2154,6 +2157,61 @@ def resolve_chunk(chunks: list[dict[str, Any]], chapter_index: int, chunk_index:
     return selected_chunk
 
 
+def format_duration(seconds: int) -> str:
+    if seconds <= 0:
+        return "soon"
+    hours, remainder = divmod(seconds, 3600)
+    minutes = remainder // 60
+    parts: list[str] = []
+    if hours:
+        parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+    if minutes:
+        parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+    return " ".join(parts) or "less than a minute"
+
+
+def extract_retry_delay_seconds(error_text: str) -> int | None:
+    retry_delay_match = re.search(r"retryDelay['\"]?\s*:\s*['\"](\d+)s['\"]", error_text)
+    if retry_delay_match:
+        return int(retry_delay_match.group(1))
+
+    retry_in_match = re.search(
+        r"Please retry in (?:(\d+)h)?(?:(\d+)m)?(?:(\d+(?:\.\d+)?)s)?",
+        error_text,
+        re.IGNORECASE,
+    )
+    if not retry_in_match:
+        return None
+
+    hours = int(retry_in_match.group(1) or 0)
+    minutes = int(retry_in_match.group(2) or 0)
+    seconds = int(float(retry_in_match.group(3) or 0))
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def is_gemini_quota_error(error_text: str) -> bool:
+    lowered = error_text.lower()
+    return (
+        "429" in error_text
+        and ("resource_exhausted" in lowered or "quota" in lowered or "rate limit" in lowered)
+    )
+
+
+def humanize_gemini_tts_error(error_text: str) -> str:
+    if is_gemini_quota_error(error_text):
+        retry_seconds = extract_retry_delay_seconds(error_text)
+        retry_text = f" Try again in about {format_duration(retry_seconds)}." if retry_seconds is not None else ""
+        return (
+            "Gemini TTS quota limit reached. The API has used the available TTS requests for this model/project."
+            f"{retry_text} After the quota resets, try generating fewer chapters per run or check your Gemini API plan and billing."
+        )
+
+    compact_error = re.sub(r"\s+", " ", error_text).strip()
+    if len(compact_error) > 500:
+        compact_error = f"{compact_error[:500].rstrip()}..."
+    return compact_error or "Gemini TTS failed."
+
+
 def synthesize_chunk_audio_with_gemini(
     prompt: str,
     voice_name: str,
@@ -2189,12 +2247,18 @@ def synthesize_chunk_audio_with_gemini(
         except (AttributeError, IndexError, KeyError, TypeError):
             last_error = "Gemini TTS did not return audio data."
         except Exception as exc:
-            last_error = str(exc)
+            raw_error = str(exc)
+            last_error = humanize_gemini_tts_error(raw_error)
+            if is_gemini_quota_error(raw_error):
+                break
 
         if attempt < max_attempts:
             if on_retry is not None:
                 on_retry(attempt + 1, max_attempts, last_error)
             time.sleep(1)
+
+    if last_error.startswith("Gemini TTS quota limit reached."):
+        raise HTTPException(status_code=429, detail=last_error)
 
     raise HTTPException(
         status_code=502,
@@ -2435,6 +2499,7 @@ def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -
             "style_instruction": request.style_instruction,
             "output_format": request.output_format,
             "audio_quality": request.audio_quality,
+            "request_limit_per_day": request.request_limit_per_day,
             "selected_chapter_indexes": extra.get("selected_chapter_indexes"),
             "generated_chapters": list(generated_chapters),
             "updated_at": now_iso(),
@@ -2663,6 +2728,7 @@ def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -
                 "style_instruction": request.style_instruction,
                 "output_format": request.output_format,
                 "audio_quality": request.audio_quality,
+                "request_limit_per_day": request.request_limit_per_day,
                 "selected_chapter_indexes": selected_chapter_indexes,
                 "generated_chapters": generated_chapters,
                 "updated_at": now_iso(),
@@ -3145,6 +3211,7 @@ def generate_book_audio(book_id: str, request: GenerateBookAudioRequest, backgro
         "pre_chapter_text_mode": request.pre_chapter_text_mode,
         "output_format": request.output_format,
         "audio_quality": request.audio_quality,
+        "request_limit_per_day": request.request_limit_per_day,
         "chapter_indexes": selected_chapter_indexes,
     }
     write_json(Path(book["extracted_path"]), extracted)
@@ -3167,6 +3234,7 @@ def generate_book_audio(book_id: str, request: GenerateBookAudioRequest, backgro
             "pre_chapter_text_mode": request.pre_chapter_text_mode,
             "output_format": request.output_format,
             "audio_quality": request.audio_quality,
+            "request_limit_per_day": request.request_limit_per_day,
             "selected_chapter_indexes": selected_chapter_indexes,
             "generated_chapters": existing_generated_chapters,
             "updated_at": now_iso(),
@@ -3184,6 +3252,7 @@ def generate_book_audio(book_id: str, request: GenerateBookAudioRequest, backgro
         "pre_chapter_text_mode": request.pre_chapter_text_mode,
         "output_format": request.output_format,
         "audio_quality": request.audio_quality,
+        "request_limit_per_day": request.request_limit_per_day,
         "selected_chapter_indexes": selected_chapter_indexes,
     }
 
