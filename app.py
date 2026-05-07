@@ -1967,14 +1967,7 @@ def prepare_chapters_for_generation(
         )
         if read_chapter_titles and prepared_chapter.chapter_title.strip():
             title_segment = build_chapter_title_segment(prepared_chapter)
-            if chapter_index == 0 and pre_chapter_text_mode == "attach_to_chapter_1" and leading_segment_count > 0:
-                prepared_chapter.segments = [
-                    *prepared_chapter.segments[:leading_segment_count],
-                    title_segment,
-                    *prepared_chapter.segments[leading_segment_count:],
-                ]
-            else:
-                prepared_chapter.segments = [title_segment, *prepared_chapter.segments]
+            prepared_chapter.segments = [title_segment, *prepared_chapter.segments]
             prepared_chapter.leading_segment_count = 0
         prepared_chapters.append(prepared_chapter)
 
@@ -2415,8 +2408,22 @@ def serialize_book(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
+def merge_generated_chapter(
+    generated_chapters: list[dict[str, Any]],
+    chapter_download: dict[str, Any],
+) -> None:
+    chapter_index = chapter_download["chapter_index"]
+    for existing_index, existing_chapter in enumerate(generated_chapters):
+        if existing_chapter.get("chapter_index") == chapter_index:
+            generated_chapters[existing_index] = chapter_download
+            return
+    generated_chapters.append(chapter_download)
+    generated_chapters.sort(key=lambda chapter: chapter.get("chapter_index", 0))
+
+
 def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -> None:
-    generated_chapters: list[dict[str, Any]] = []
+    existing_status = read_audio_generation_status(book_id) or {}
+    generated_chapters: list[dict[str, Any]] = list(existing_status.get("generated_chapters") or [])
 
     def build_audio_status_payload(**extra: Any) -> dict[str, Any]:
         payload = {
@@ -2582,14 +2589,15 @@ def run_book_audio_generation(book_id: str, request: GenerateBookAudioRequest) -
                     chapter_sample_rates.get(chapter_index, DEFAULT_AUDIO_SAMPLE_RATE),
                 )
                 chapter_output_paths.append(chapter_output_path)
-                generated_chapters.append(
+                merge_generated_chapter(
+                    generated_chapters,
                     {
                         "chapter_index": chapter_index,
                         "chapter_title": chapter_titles[chapter_index],
                         "file_name": chapter_output_path.name,
                         "download_url": f"/files/audio/{book_id}/{chapter_output_path.name}",
                         "output_format": request.output_format,
-                    }
+                    },
                 )
                 chapter_audio.pop(chapter_index, None)
                 chapter_sample_rates.pop(chapter_index, None)
@@ -3118,6 +3126,7 @@ def generate_book_audio(book_id: str, request: GenerateBookAudioRequest, backgro
     existing_status = read_audio_generation_status(book_id)
     if existing_status and existing_status.get("state") == "running":
         raise HTTPException(status_code=409, detail="Audio generation is already running for this book.")
+    existing_generated_chapters = list((existing_status or {}).get("generated_chapters") or [])
 
     prepared_chapters = prepare_chapters_for_generation(
         AnnotationDocument.model_validate(approved).chapters,
@@ -3159,6 +3168,7 @@ def generate_book_audio(book_id: str, request: GenerateBookAudioRequest, backgro
             "output_format": request.output_format,
             "audio_quality": request.audio_quality,
             "selected_chapter_indexes": selected_chapter_indexes,
+            "generated_chapters": existing_generated_chapters,
             "updated_at": now_iso(),
         },
     )

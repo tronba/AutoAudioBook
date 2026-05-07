@@ -383,19 +383,19 @@
 
     .chapter-list {
       display: grid;
-      gap: 10px;
+      gap: 0;
       border: 1px solid var(--line);
-      border-radius: 18px;
+      border-radius: 12px;
       background: rgba(255, 255, 255, 0.7);
-      padding: 14px;
+      padding: 6px 10px;
     }
 
     .chapter-item {
       display: grid;
       grid-template-columns: auto 1fr;
-      gap: 10px;
-      align-items: start;
-      padding: 10px 0;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 0;
       border-top: 1px solid rgba(65, 48, 35, 0.12);
     }
 
@@ -410,37 +410,48 @@
 
     .chapter-title {
       font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .chapter-body {
-      display: grid;
-      gap: 4px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      min-width: 0;
     }
 
       .chapter-row-head {
         display: flex;
-        justify-content: space-between;
-        gap: 12px;
+        gap: 10px;
         align-items: center;
-        flex-wrap: wrap;
+        flex: 1 1 auto;
+        flex-wrap: nowrap;
+        min-width: 0;
       }
 
       .chapter-row-actions {
         display: flex;
         align-items: center;
-        gap: 10px;
-        flex-wrap: wrap;
+        gap: 8px;
+        flex: 0 0 auto;
+        flex-wrap: nowrap;
+        justify-content: flex-end;
       }
 
     .chapter-meta {
       color: var(--muted);
-      font-size: 0.84rem;
+      font-size: 0.8rem;
+      white-space: nowrap;
     }
 
     .chapter-progress {
       color: var(--accent);
-      font-size: 0.84rem;
+      font-size: 0.8rem;
       font-weight: 600;
+      white-space: nowrap;
     }
 
     .upload-hint {
@@ -1135,10 +1146,8 @@
       }
 
       return `
-        <div class="chapter-row-actions">
-          <div class="chapter-meta">${escapeHtml(chapterDownload.file_name)}</div>
-          <a class="download-link" href="${chapterDownload.download_url}" download>Download chapter</a>
-        </div>
+        <div class="chapter-meta">${escapeHtml(chapterDownload.file_name)}</div>
+        <a class="download-link" href="${chapterDownload.download_url}" download>Download chapter</a>
       `;
     }
 
@@ -1171,10 +1180,12 @@
               <div class="chapter-body">
                 <div class="chapter-row-head">
                   <div class="chapter-title">${chapter.chapter_title}</div>
+                  <div class="chapter-meta">${chapter.estimated_chunk_count} chunks · ${chapter.char_count} chars</div>
+                  ${getActiveChapterProgress(chapter.chapter_index)}
+                </div>
+                <div class="chapter-row-actions">
                   ${getChapterDownloadMarkup(chapter.chapter_index)}
                 </div>
-                <div class="chapter-meta">Estimated chunks: ${chapter.estimated_chunk_count} · Characters: ${chapter.char_count}</div>
-                ${getActiveChapterProgress(chapter.chapter_index)}
               </div>
             </label>
           `;
@@ -1473,6 +1484,7 @@
 
       elements.audioButton.disabled = true;
       elements.audioLink.hidden = true;
+      const existingGeneratedChapters = state.audioGenerationStatus?.generated_chapters || [];
       setStatus(elements.audioStatus, 'Queued chapter audio generation...');
       try {
         const result = await fetchJson(`/api/books/${state.currentBook.id}/generate-book-audio`, {
@@ -1498,7 +1510,7 @@
           chunk_index: 0,
           chunk_count: 0,
           selected_chapter_indexes: state.selectedChapterIndexes,
-          generated_chapters: [],
+          generated_chapters: existingGeneratedChapters,
         };
         setStatus(elements.audioStatus, `${result.step} chapter audio generation...`);
         renderGeneratedDownloads(state.audioGenerationStatus);
