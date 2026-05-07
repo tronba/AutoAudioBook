@@ -52,6 +52,8 @@ DEFAULT_AUDIO_SAMPLE_RATE = 24000
 DEFAULT_STYLE_INSTRUCTION = "Read aloud in a warm, welcoming tone with clear diction and natural pacing."
 DEFAULT_GEMINI_TEXT_MODEL = "gemini-2.5-flash"
 DEFAULT_GEMINI_TTS_MODEL = "gemini-3.1-flash-tts-preview"
+DEFAULT_ANNOTATION_BATCH_MAX_SEGMENTS = 45
+DEFAULT_ANNOTATION_BATCH_MAX_CHARS = 12000
 CHUNK_TARGET_PRESETS = [100, 200, 300, 400, 500, 650, 800, 1000, 1250, 1500]
 CHUNK_HARD_OVERFLOW_PRESETS = [0, 25, 50, 75, 100, 150, 200, 300, 400, 500]
 DEFAULT_MAX_CHARS = 500
@@ -1369,6 +1371,43 @@ def validate_annotated_chapter(
     )
 
 
+def split_chapter_for_annotation(
+    chapter: AnnotatedChapter,
+    max_segments: int = DEFAULT_ANNOTATION_BATCH_MAX_SEGMENTS,
+    max_chars: int = DEFAULT_ANNOTATION_BATCH_MAX_CHARS,
+) -> list[AnnotatedChapter]:
+    batches: list[AnnotatedChapter] = []
+    batch_segments: list[SegmentAnnotation] = []
+    batch_chars = 0
+
+    def flush_batch() -> None:
+        nonlocal batch_segments, batch_chars
+        if not batch_segments:
+            return
+        batches.append(
+            AnnotatedChapter(
+                chapter_id=chapter.chapter_id,
+                chapter_title=chapter.chapter_title,
+                leading_segment_count=0,
+                segments=batch_segments,
+            )
+        )
+        batch_segments = []
+        batch_chars = 0
+
+    for segment in chapter.segments:
+        segment_chars = len(segment.clean_text)
+        would_exceed_segments = len(batch_segments) >= max_segments
+        would_exceed_chars = batch_segments and batch_chars + segment_chars > max_chars
+        if would_exceed_segments or would_exceed_chars:
+            flush_batch()
+        batch_segments.append(segment)
+        batch_chars += segment_chars
+
+    flush_batch()
+    return batches
+
+
 def annotate_chapter_with_gemini(
     book_title: str,
     chapter: AnnotatedChapter,
@@ -1439,6 +1478,44 @@ def annotate_chapter_with_gemini(
     return validate_annotated_chapter(chapter, annotated, expressive_mode, vocalization_mode)
 
 
+def annotate_chapter_in_batches_with_gemini(
+    book_title: str,
+    chapter: AnnotatedChapter,
+    expressive_mode: TagGenerationMode = DEFAULT_EXPRESSIVE_TAG_MODE,
+    vocalization_mode: TagGenerationMode = DEFAULT_VOCALIZATION_TAG_MODE,
+) -> AnnotatedChapter:
+    batches = split_chapter_for_annotation(chapter)
+    if len(batches) <= 1:
+        return annotate_chapter_with_gemini(book_title, chapter, expressive_mode, vocalization_mode)
+
+    annotated_segments: list[SegmentAnnotation] = []
+    for batch_index, batch in enumerate(batches, start=1):
+        try:
+            annotated_batch = annotate_chapter_with_gemini(
+                book_title,
+                batch,
+                expressive_mode,
+                vocalization_mode,
+            )
+        except Exception as exc:
+            detail = exc.detail if isinstance(exc, HTTPException) else str(exc)
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    f"Gemini annotation failed for chapter '{chapter.chapter_title}', "
+                    f"batch {batch_index} of {len(batches)}: {detail}"
+                ),
+            ) from exc
+        annotated_segments.extend(annotated_batch.segments)
+
+    return AnnotatedChapter(
+        chapter_id=chapter.chapter_id,
+        chapter_title=chapter.chapter_title,
+        leading_segment_count=chapter.leading_segment_count,
+        segments=annotated_segments,
+    )
+
+
 def generate_annotation_document(
     extracted: dict[str, Any],
     expressive_mode: TagGenerationMode = DEFAULT_EXPRESSIVE_TAG_MODE,
@@ -1458,7 +1535,7 @@ def generate_annotation_document(
         if progress_callback is not None:
             progress_callback("Annotating chapters", chapter_number - 1, total_chapters, chapter.chapter_title)
         annotated_chapters.append(
-            annotate_chapter_with_gemini(
+            annotate_chapter_in_batches_with_gemini(
                 heuristic_annotations.title,
                 chapter,
                 expressive_mode,
@@ -2188,30 +2265,47 @@ def build_draft_annotation_status_path(book_id: str) -> Path:
     return ANNOTATED_DIR / f"{book_id}-generation-status.json"
 
 
+def write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    temporary_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    os.replace(temporary_path, path)
+
+
+def read_json_with_retry(path: Path, attempts: int = 3, delay_seconds: float = 0.05) -> dict[str, Any]:
+    last_error: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            last_error = exc
+            if attempt < attempts - 1:
+                time.sleep(delay_seconds)
+    raise last_error or RuntimeError(f"Failed to read JSON file: {path}")
+
+
 def write_audio_generation_status(book_id: str, payload: dict[str, Any]) -> None:
     path = build_audio_status_path(book_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    write_json_atomic(path, payload)
 
 
 def read_audio_generation_status(book_id: str) -> dict[str, Any] | None:
     path = build_audio_status_path(book_id)
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    return read_json_with_retry(path)
 
 
 def write_draft_annotation_status(book_id: str, payload: dict[str, Any]) -> None:
     path = build_draft_annotation_status_path(book_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    write_json_atomic(path, payload)
 
 
 def read_draft_annotation_status(book_id: str) -> dict[str, Any] | None:
     path = build_draft_annotation_status_path(book_id)
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    return read_json_with_retry(path)
 
 
 def materialize_chapter_audio_output(
